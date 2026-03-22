@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="E-Inventory — professional vehicle inventory, billing, ledger, and sales reporting for dealerships."
+    />
+    <title>E-Inventory · Vehicle sales &amp; inventory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand__logo" id="appLogoMark" aria-hidden="true">EI</div>
+        <div class="brand__text">
+          <div class="brand__title" id="appCompanyName">E-Inventory</div>
+          <div class="brand__subtitle" id="appCompanySubtitle">Vehicle sales &amp; inventory</div>
+        </div>
+      </div>
+
+      <div class="topbar__right">
+        <div class="userPill" id="userPill" hidden>
+          <span class="userPill__name" id="userNameLabel">—</span>
+          <span class="userPill__role" id="userRoleLabel">—</span>
+        </div>
+        <button class="btn btn--ghost" id="btnLogout" hidden>Logout</button>
+      </div>
+
+      <nav class="mainNav" aria-label="Main navigation">
+        <button class="navItem navItem--home is-active" type="button" data-nav="home">Home</button>
+
+        <details class="menu" id="mainMenu">
+          <summary class="navItem navItem--menu">Main Menu</summary>
+          <div class="menu__panel" role="menu" aria-label="Main menu items">
+            <button class="menu__item" type="button" data-nav="inventory">Inventory</button>
+            <button class="menu__item" type="button" data-nav="inventoryReports">Inventory Reports</button>
+            <button class="menu__item" type="button" data-nav="billing">Billing</button>
+            <button class="menu__item" type="button" data-nav="ledger">Ledger</button>
+            <button class="menu__item" type="button" data-nav="reports">Sales Reports</button>
+            <div class="menu__sep"></div>
+            <button class="menu__item" type="button" data-nav="brokers">Brokers</button>
+            <button class="menu__item" type="button" data-nav="purchase">Purchase</button>
+            <button class="menu__item" type="button" data-nav="suppliers">Supplier</button>
+            <div class="menu__sep"></div>
+            <button class="menu__item" type="button" data-nav="users">Users</button>
+            <div class="menu__sep"></div>
+            <div class="menu__account">
+              <div class="menu__accountHeading">Account</div>
+              <div class="menu__accountInfo" id="menuAccountInfo"></div>
+              <button class="menu__item menu__item--account" type="button" id="btnMenuLogin">Log in</button>
+              <button class="menu__item menu__item--account" type="button" id="btnMenuLogout" hidden>Log out</button>
+            </div>
+          </div>
+        </details>
+      </nav>
+    </header>
+
+    <main class="container">
+      <section class="panel" id="panel-home" data-panel="home" role="tabpanel">
+        <div class="homeHero">
+          <div class="homeHero__overlay">
+            <div class="homeHero__card">
+              <div class="homeHero__eyebrow">Welcome</div>
+              <div class="homeHero__title" id="homeTitle">Operations dashboard</div>
+              <div class="homeHero__subtitle muted">
+                Manage stock, process sales, track the ledger, and run reports — with role-based access for your team.
+              </div>
+              <div class="homeHero__actions">
+                <button class="btn btn--primary" id="btnGoInventory" type="button">Open inventory</button>
+              </div>
+              <div class="homeHero__hint muted">
+                Sign in to continue. Permissions are enforced by role (RBAC).
+              </div>
+              <div class="homeHero__hint muted" id="homeCopyright" style="margin-top:12px;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-inventory" data-panel="inventory" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Inventory</h2>
+            <p class="muted">Add vehicles, attach documents, edit/delete, and add to cart.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn" id="btnExportData" title="Export data JSON">Export</button>
+            <label class="btn btn--ghost" for="importFile" title="Import data JSON">Import</label>
+            <input id="importFile" type="file" accept="application/json" hidden />
+            <button class="btn btn--danger" id="btnResetAll" title="Clears all saved data">Reset All</button>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <form id="vehicleForm" class="card">
+            <div class="card__header">
+              <h3 id="vehicleFormTitle">Add Vehicle</h3>
+              <span class="badge" id="vehicleFormModeBadge">New</span>
+            </div>
+
+            <input type="hidden" id="vehicleId" />
+
+            <div class="formGrid">
+              <label class="field">
+                <span>Stock No.</span>
+                <input id="stockNo" type="text" placeholder="e.g. STK-001" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>VIN / Chassis</span>
+                <input id="vin" type="text" placeholder="optional" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Make</span>
+                <input id="make" type="text" placeholder="e.g. Toyota" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Model</span>
+                <input id="model" type="text" placeholder="e.g. Corolla" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Year</span>
+                <input id="year" type="number" inputmode="numeric" min="1900" max="2100" placeholder="e.g. 2020" />
+              </label>
+              <label class="field">
+                <span>Color</span>
+                <input id="color" type="text" placeholder="optional" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle Number</span>
+                <input id="vehicleNumber" type="text" placeholder="e.g. ABC-1234" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle Type</span>
+                <select id="vehicleType">
+                  <option value="">Select</option>
+                  <option value="Car">Car</option>
+                  <option value="Van">Van</option>
+                  <option value="Bus">Bus</option>
+                  <option value="Truck">Truck</option>
+                  <option value="Pickup">Pickup</option>
+                  <option value="Bike">Bike</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Broker Name</span>
+                <select id="vehicleBrokerName">
+                  <option value="Self">Self</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Country of Origin</span>
+                <input id="countryOfOrigin" type="text" placeholder="e.g. Japan" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Mileage (km)</span>
+                <input id="mileageKm" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 45000" />
+              </label>
+              <label class="field">
+                <span>Fuel Type</span>
+                <select id="fuelType">
+                  <option value="">Select</option>
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Electric (EV)">Electric (EV)</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Vehicle Condition</span>
+                <select id="vehicleCondition">
+                  <option value="">Select</option>
+                  <option value="Brand New">Brand New</option>
+                  <option value="Used">Used</option>
+                </select>
+              </label>
+              <div class="field field--full" id="leaseSection" hidden>
+                <span>Leasing Details (Used Vehicles)</span>
+                <div class="formGrid" style="padding:0; grid-template-columns: 1fr 1fr;">
+                  <label class="field">
+                    <span>Leasing</span>
+                    <select id="leasingStatus">
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Leasing Company</span>
+                    <input id="leasingCompany" type="text" placeholder="e.g. ABC Finance" />
+                  </label>
+                  <label class="field">
+                    <span>Lease Amount</span>
+                    <input id="leaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="field">
+                    <span>Lease Balance Amount</span>
+                    <input id="leaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="field">
+                    <span>Lease Period</span>
+                    <input id="leasePeriod" type="text" placeholder="e.g. 60 months" />
+                  </label>
+                  <label class="field field--full">
+                    <span>Lease Balance Period</span>
+                    <input id="leaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
+                  </label>
+                </div>
+              </div>
+              <label class="field">
+                <span>Engine CC</span>
+                <input id="engineCc" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 1500" />
+              </label>
+              <label class="field">
+                <span>Cost Price</span>
+                <input id="costPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label class="field">
+                <span>Selling Price</span>
+                <input id="sellPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required />
+              </label>
+              <div class="field field--full">
+                <span>Vehicle Image</span>
+                <div class="row">
+                  <label class="btn btn--primary" for="vehicleImageInput">Upload Image</label>
+                  <input id="vehicleImageInput" type="file" accept="image/*" hidden />
+                  <button class="btn btn--danger" type="button" id="btnClearVehicleImage">Remove Image</button>
+                  <div class="muted" id="vehicleImageHint">JPG/PNG recommended.</div>
+                </div>
+                <div class="imgPreviewWrap" id="vehicleImagePreviewWrap" hidden>
+                  <img id="vehicleImagePreview" alt="Vehicle" />
+                </div>
+              </div>
+              <label class="field field--full">
+                <span>Notes</span>
+                <textarea id="notes" rows="3" placeholder="optional"></textarea>
+              </label>
+            </div>
+
+            <div class="row row--between">
+              <button type="submit" class="btn btn--primary" id="btnSaveVehicle">Save</button>
+              <div class="row">
+                <button type="button" class="btn btn--ghost" id="btnClearVehicleForm">Clear</button>
+                <button type="button" class="btn btn--danger" id="btnDeleteVehicle" hidden>Delete</button>
+              </div>
+            </div>
+          </form>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>Inventory List</h3>
+              <div class="row">
+                <input id="inventorySearch" class="input" type="search" placeholder="Search stock / VIN / make / model" />
+                <select id="inventoryFilterStatus" class="input">
+                  <option value="all">All</option>
+                  <option value="available">Available</option>
+                  <option value="sold">Sold</option>
+                </select>
+              </div>
+            </div>
+            <div class="card__footer" style="border-top:none;">
+              <div class="row" style="justify-content: space-between; align-items: center;">
+                <div class="row">
+                  <span class="pill" id="invCountTotal">Total: 0</span>
+                  <button class="pill pill--ok" id="btnShowAvailable" type="button" title="Show available vehicles">Available: 0</button>
+                  <button class="pill pill--warn" id="btnShowSold" type="button" title="Show sold vehicles">Sold: 0</button>
+                </div>
+                <button class="btn btn--ghost" id="btnShowAllInv" type="button" title="Show all vehicles">Show All</button>
+              </div>
+            </div>
+
+            <div class="tableWrap">
+              <table class="table" id="inventoryTable">
+                <thead>
+                  <tr>
+                    <th>Image</th>
+                    <th>Stock</th>
+                    <th class="num">Year</th>
+                    <th>Make</th>
+                    <th>Model</th>
+                    <th>Status</th>
+                    <th class="num">Price</th>
+                    <th>Docs</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="inventorySummary">0 vehicles</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-inventory-reports" data-panel="inventoryReports" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Inventory Reports</h2>
+            <p class="muted">Stock on hand, waste, reorder points, and totals by vehicle type.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" id="btnSaveInventoryReportSettings" type="button">Save Settings</button>
+            <button class="btn" id="btnDownloadInventoryReportsCsv" type="button">Download CSV</button>
+            <button class="btn btn--ghost" id="btnPrintInventoryReports" type="button">Print</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Totals</h3>
+          </div>
+
+          <div class="kpis" id="inventoryReportKpis">
+            <div class="kpi">
+              <div class="muted">Stock on hand</div>
+              <div class="kpi__value" id="kpiInvOnHand">0</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Total waste (settings)</div>
+              <div class="kpi__value" id="kpiInvWaste">0</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Total cost price</div>
+              <div class="kpi__value" id="kpiInvTotalCost">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Total selling price</div>
+              <div class="kpi__value" id="kpiInvTotalSell">0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>By Vehicle Type</h3>
+          </div>
+
+          <div class="tableWrap">
+            <table class="table table--dense" id="inventoryReportsTable">
+              <thead>
+                <tr>
+                  <th>Vehicle Type</th>
+                  <th class="num">Stock on hand</th>
+                  <th class="num">Waste</th>
+                  <th class="num">Reorder point</th>
+                  <th class="num">Effective stock</th>
+                  <th>Reorder</th>
+                  <th class="num">Total Cost Price</th>
+                  <th class="num">Total Selling Price</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="card__footer muted" id="inventoryReportsSummary">0 types</div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-billing" data-panel="billing" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Billing</h2>
+            <p class="muted">Add items from inventory to cart, generate invoice, and print.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--ghost" id="btnClearCart">Clear Cart</button>
+            <button class="btn btn--primary" id="btnCompleteSale">Complete Sale</button>
+            <button class="btn" id="btnPrintInvoice">Print Bill</button>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <div class="card__header">
+              <h3>Cart</h3>
+              <span class="badge" id="cartCountBadge">0</span>
+            </div>
+
+            <div class="tableWrap">
+              <table class="table" id="cartTable">
+                <thead>
+                  <tr>
+                    <th>Stock</th>
+                    <th>Vehicle</th>
+                    <th class="num">Price</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <div class="totals">
+              <div class="totals__row">
+                <span>Subtotal</span>
+                <strong id="cartSubtotal">0.00</strong>
+              </div>
+              <div class="totals__row">
+                <label class="field field--inline">
+                  <span>Discount</span>
+                  <input id="cartDiscount" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <strong id="cartTotal">0.00</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>Invoice Details</h3>
+              <span class="badge badge--soft">Preview</span>
+            </div>
+
+            <div class="formGrid">
+              <div class="field field--full">
+                <span>Company Information (Admin)</span>
+                <div class="row">
+                  <label class="btn btn--primary" for="invoiceLogoInput">Upload Logo</label>
+                  <input id="invoiceLogoInput" type="file" accept="image/*" hidden />
+                  <button class="btn btn--danger" type="button" id="btnClearInvoiceLogo">Remove Logo</button>
+                  <input id="companyName" type="text" placeholder="Company name" />
+                </div>
+              </div>
+              <label class="field field--full">
+                <span>Company Address</span>
+                <input id="companyAddress" type="text" placeholder="Address line" />
+              </label>
+              <label class="field">
+                <span>Company Phone</span>
+                <input id="companyPhone" type="tel" placeholder="Phone" />
+              </label>
+              <label class="field">
+                <span>Company Email</span>
+                <input id="companyEmail" type="email" placeholder="Email" />
+              </label>
+              <label class="field field--full">
+                <span>Company Website</span>
+                <input id="companyWebsite" type="url" placeholder="Website (optional)" />
+              </label>
+              <label class="field">
+                <span>Customer Name</span>
+                <input id="customerName" type="text" placeholder="optional" />
+              </label>
+              <label class="field">
+                <span>Customer Phone</span>
+                <input id="customerPhone" type="tel" placeholder="optional" />
+              </label>
+              <label class="field">
+                <span>Payment Method</span>
+                <select id="paymentMethod">
+                  <option value="Cash">Cash</option>
+                  <option value="Bank">Bank</option>
+                  <option value="Card">Card</option>
+                  <option value="Mixed">Mixed</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Invoice No.</span>
+                <input id="invoiceNo" type="text" placeholder="auto" />
+              </label>
+              <label class="field">
+                <span>BEARING Amount (editable)</span>
+                <input id="bearingAmount" type="number" min="0" step="0.01" placeholder="auto from total" />
+              </label>
+              <label class="field">
+                <span>For the Sum of LKR (editable)</span>
+                <input id="sumLkrAmount" type="number" min="0" step="0.01" placeholder="auto from total" />
+              </label>
+              <label class="field field--full">
+                <span>Remarks</span>
+                <textarea id="invoiceRemarks" rows="3" placeholder="optional"></textarea>
+              </label>
+            </div>
+
+            <div class="invoicePreview" id="invoicePreview">
+              <div class="invoice">
+                <div class="invoiceHead">
+                  <div class="invoiceHead__brand">
+                    <img id="invLogo" class="invoice__logo" alt="Logo" hidden />
+                    <div>
+                      <div class="invoice__title" id="invTitle">Vehicle Sale Invoice</div>
+                      <div class="muted" id="invCompanyLine" style="margin-top:4px;">—</div>
+                    </div>
+                  </div>
+                  <div class="invoiceHead__meta">
+                    <div>Invoice: <strong id="invNo">—</strong></div>
+                    <div>Date: <strong id="invDate">—</strong></div>
+                  </div>
+                </div>
+
+                <div class="invoiceDocTitle">DEALERS IN MOTOR VEHICLES</div>
+
+                <div class="invoiceLine">
+                  SALE OF: <span id="invSaleOf">—</span>
+                  <span id="invMetaLine" hidden></span>
+                </div>
+                <div class="invoiceLine">REG NO: <span id="invRegNo">—</span></div>
+
+                <div class="tableWrap">
+                  <table class="table table--dense" id="invoiceItemsTable">
+                    <thead>
+                      <tr>
+                        <th>Stock</th>
+                        <th>Description</th>
+                        <th class="num">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+
+                <div class="invoiceLine">
+                  I / WE HAVE SOLD THE ABOVE MENTIONED VEHICLE TO MR/MRS/MS
+                  <span id="invCustomer">Walk-in</span> (Phone: <span id="invPhone">—</span>)
+                </div>
+
+                <div class="invoiceLine">
+                  BEARING <span id="invBearingAmount">0.00</span>
+                  for the sum of LKR <span id="invSumLkrAmount">0.00</span>
+                  <span id="invSubtotal" hidden>0.00</span>
+                  <span id="invDiscount" hidden>0.00</span>
+                  <span id="invTotal" hidden>0.00</span>
+                </div>
+                <div class="invoiceLine">(IN WORDS) <span id="invAmountWords">—</span></div>
+                <div class="invoiceLine">
+                  AND HAVE THE FOLLOWING PAYMENTS:
+                  <span id="invPaymentsSummary">—</span>
+                </div>
+                <div class="invoiceLine">PAYMENT METHOD: <span id="invPayment">Cash</span></div>
+
+                <div class="invoiceDocs">
+                  <div class="invoiceDocs__title">DOCUMENTS</div>
+                  <div class="invoiceLineGrid">
+                    <div>ORIGINAL CR: <span id="invDocOriginalCr">—</span></div>
+                    <div>NO OBJECTION LETTER: <span id="invDocNoObj">—</span></div>
+                  </div>
+                  <div class="invoiceLineGrid">
+                    <div>DELETION: <span id="invDocDeletion">—</span></div>
+                    <div>REVENUE LICENCE: <span id="invDocRevenue">—</span></div>
+                  </div>
+                  <div class="invoiceLine">OTHERS: <span id="invDocOthers">—</span></div>
+                </div>
+
+                <div class="invoiceTerms">
+                  <div><strong>TERMS AND CONDITIONS</strong></div>
+                  <div id="invTerms">
+                    Ownership of the vehicle should be transferred within 10 days from the date of sale.
+                  </div>
+                </div>
+
+                <div class="invoiceSignGrid">
+                  <div class="invoiceSign">
+                    <div class="line">SELLER SIGNATURE</div>
+                    <div class="line">WITNESS</div>
+                    <div class="line">NAME</div>
+                    <div class="line">NIC</div>
+                    <div class="line">SIGNATURE</div>
+                  </div>
+                  <div class="invoiceSign">
+                    <div class="line">BUYER SIGNATURE</div>
+                    <div class="line">WITNESS</div>
+                    <div class="line">NAME</div>
+                    <div class="line">NIC</div>
+                    <div class="line">SIGNATURE</div>
+                  </div>
+                </div>
+
+                <div class="invoice__footer muted" id="invFooter">Thank you.</div>
+                <div class="invoice__copyright muted" id="invCopyright"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-ledger" data-panel="ledger" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Ledger</h2>
+            <p class="muted">Record income/expense entries. Sales auto-create income entries.</p>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <form id="ledgerForm" class="card">
+            <div class="card__header">
+              <h3>Add Ledger Entry</h3>
+              <span class="badge badge--soft">Manual</span>
+            </div>
+
+            <div class="formGrid">
+              <label class="field">
+                <span>Type</span>
+                <select id="ledgerType" required>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Category</span>
+                <input id="ledgerCategory" type="text" placeholder="e.g. Transport / Office / Bank" required />
+              </label>
+              <label class="field">
+                <span>Amount</span>
+                <input id="ledgerAmount" type="number" inputmode="decimal" min="0" step="0.01" required />
+              </label>
+              <label class="field">
+                <span>Date</span>
+                <input id="ledgerDate" type="date" />
+              </label>
+              <label class="field field--full">
+                <span>Details</span>
+                <textarea id="ledgerDetails" rows="3" placeholder="optional"></textarea>
+              </label>
+            </div>
+
+            <div class="row row--between">
+              <button type="submit" class="btn btn--primary">Add Entry</button>
+              <button type="reset" class="btn btn--ghost">Clear</button>
+            </div>
+          </form>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>Ledger Entries</h3>
+              <div class="row">
+                <input id="ledgerSearch" class="input" type="search" placeholder="Search category/details" />
+                <select id="ledgerFilterType" class="input">
+                  <option value="all">All</option>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="ledgerTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Details</th>
+                    <th class="num">Amount</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="ledgerSummary">0 entries</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-reports" data-panel="reports" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Sales Reports</h2>
+            <p class="muted">View sales, totals, and export. Filter by date.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn" id="btnExportSalesCsv">Export CSV</button>
+            <button class="btn" id="btnExportSalesPdf">Export PDF</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Sales</h3>
+            <div class="row">
+              <label class="field field--inline">
+                <span>From</span>
+                <input id="reportFrom" type="date" />
+              </label>
+              <label class="field field--inline">
+                <span>To</span>
+                <input id="reportTo" type="date" />
+              </label>
+              <button class="btn btn--ghost" id="btnApplyReportFilter" type="button">Apply</button>
+              <button class="btn btn--ghost" id="btnClearReportFilter" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div class="kpis" id="reportKpis">
+            <div class="kpi">
+              <div class="muted">Sales Count</div>
+              <div class="kpi__value" id="kpiSalesCount">0</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Gross Sales</div>
+              <div class="kpi__value" id="kpiGross">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Discount</div>
+              <div class="kpi__value" id="kpiDiscount">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Net Sales</div>
+              <div class="kpi__value" id="kpiNet">0.00</div>
+            </div>
+          </div>
+
+          <div class="tableWrap">
+            <table class="table" id="salesTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Invoice</th>
+                  <th>Customer</th>
+                  <th>Payment</th>
+                  <th>Items</th>
+                  <th class="num">Net</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card__footer muted" id="salesSummary">0 sales</div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-users" data-panel="users" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Users</h2>
+            <p class="muted">Admin-only. Create users and assign roles (RBAC).</p>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <form id="userForm" class="card">
+            <div class="card__header">
+              <h3>Create User</h3>
+              <span class="badge badge--soft">Admin</span>
+            </div>
+
+            <div class="formGrid">
+              <label class="field">
+                <span>Username</span>
+                <input id="newUsername" type="text" autocomplete="off" placeholder="e.g. cashier1" required />
+              </label>
+              <label class="field">
+                <span>Display Name</span>
+                <input id="newName" type="text" autocomplete="off" placeholder="e.g. Nimal" required />
+              </label>
+              <label class="field">
+                <span>Role</span>
+                <select id="newRole" required>
+                  <option value="cashier">cashier</option>
+                  <option value="supervisor">supervisor</option>
+                  <option value="manager">manager</option>
+                  <option value="admin">admin</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Temporary Password</span>
+                <input id="newPassword" type="password" autocomplete="new-password" required />
+              </label>
+            </div>
+
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Create</button>
+              <button class="btn btn--ghost" type="reset">Clear</button>
+            </div>
+          </form>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>User List</h3>
+              <div class="row">
+                <input id="userSearch" class="input" type="search" placeholder="Search username/name/role" />
+              </div>
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="usersTable">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Permissions</th>
+                    <th>Status</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="usersSummary">0 users</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-brokers" data-panel="brokers" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Brokers</h2>
+            <p class="muted">Manage broker contacts.</p>
+          </div>
+        </div>
+        <div class="grid grid--2">
+          <form id="brokerForm" class="card">
+            <div class="card__header">
+              <h3>Add Broker</h3>
+              <span class="badge badge--soft">CRUD</span>
+            </div>
+            <input type="hidden" id="brokerId" />
+            <div class="formGrid">
+              <label class="field"><span>Name</span><input id="brokerName" type="text" required /></label>
+              <label class="field"><span>Phone</span><input id="brokerPhone" type="tel" /></label>
+              <label class="field"><span>Email</span><input id="brokerEmail" type="email" /></label>
+              <label class="field field--full"><span>Address</span><input id="brokerAddress" type="text" /></label>
+              <label class="field field--full"><span>Notes</span><textarea id="brokerNotes" rows="3"></textarea></label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Save</button>
+              <div class="row">
+                <button class="btn btn--ghost" type="reset">Clear</button>
+                <button class="btn btn--danger" type="button" id="btnDeleteBroker">Delete</button>
+              </div>
+            </div>
+          </form>
+          <div class="card">
+            <div class="card__header">
+              <h3>Broker List</h3>
+              <input id="brokerSearch" class="input" type="search" placeholder="Search brokers" />
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="brokersTable">
+                <thead>
+                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="brokersSummary">0 brokers</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-suppliers" data-panel="suppliers" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Supplier</h2>
+            <p class="muted">Manage supplier contacts.</p>
+          </div>
+        </div>
+        <div class="grid grid--2">
+          <form id="supplierForm" class="card">
+            <div class="card__header">
+              <h3>Add Supplier</h3>
+              <span class="badge badge--soft">CRUD</span>
+            </div>
+            <input type="hidden" id="supplierId" />
+            <div class="formGrid">
+              <label class="field"><span>Name</span><input id="supplierName" type="text" required /></label>
+              <label class="field"><span>Phone</span><input id="supplierPhone" type="tel" /></label>
+              <label class="field"><span>Email</span><input id="supplierEmail" type="email" /></label>
+              <label class="field field--full"><span>Address</span><input id="supplierAddress" type="text" /></label>
+              <label class="field field--full"><span>Notes</span><textarea id="supplierNotes" rows="3"></textarea></label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Save</button>
+              <div class="row">
+                <button class="btn btn--ghost" type="reset">Clear</button>
+                <button class="btn btn--danger" type="button" id="btnDeleteSupplier">Delete</button>
+              </div>
+            </div>
+          </form>
+          <div class="card">
+            <div class="card__header">
+              <h3>Supplier List</h3>
+              <input id="supplierSearch" class="input" type="search" placeholder="Search suppliers" />
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="suppliersTable">
+                <thead>
+                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="suppliersSummary">0 suppliers</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-purchase" data-panel="purchase" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Purchase</h2>
+            <p class="muted">Record vehicle purchases (from supplier/broker).</p>
+          </div>
+        </div>
+        <div class="grid grid--2">
+          <form id="purchaseForm" class="card">
+            <div class="card__header">
+              <h3>Add Purchase</h3>
+              <span class="badge badge--soft">Entry</span>
+            </div>
+            <div class="formGrid">
+              <label class="field"><span>Date</span><input id="purchaseDate" type="date" /></label>
+              <label class="field"><span>Source</span>
+                <select id="purchaseSource">
+                  <option value="supplier">Supplier</option>
+                  <option value="broker">Broker</option>
+                </select>
+              </label>
+              <label class="field"><span>Supplier/Broker</span><select id="purchaseParty"></select></label>
+              <label class="field"><span>Stock No.</span><input id="purchaseStockNo" type="text" placeholder="optional" /></label>
+              <label class="field"><span>Vehicle</span><input id="purchaseVehicle" type="text" placeholder="e.g. Toyota Corolla" required /></label>
+              <label class="field"><span>Cost</span><input id="purchaseCost" type="number" min="0" step="0.01" required /></label>
+              <label class="field field--full"><span>Notes</span><textarea id="purchaseNotes" rows="3"></textarea></label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Save</button>
+              <button class="btn btn--ghost" type="reset">Clear</button>
+            </div>
+          </form>
+          <div class="card">
+            <div class="card__header">
+              <h3>Purchase List</h3>
+              <input id="purchaseSearch" class="input" type="search" placeholder="Search purchases" />
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="purchaseTable">
+                <thead>
+                  <tr><th>Date</th><th>Source</th><th>Party</th><th>Vehicle</th><th class="num">Cost</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="purchaseSummary">0 purchases</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="dialog" id="docsDialog">
+      <form method="dialog" class="dialog__card" id="docsDialogForm">
+        <div class="dialog__header">
+          <h3>Vehicle Documents</h3>
+          <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body">
+          <div class="muted" id="docsVehicleLine">—</div>
+
+          <div class="row row--between mt12">
+            <label class="btn btn--primary" for="docsFileInput">Add Documents</label>
+            <input id="docsFileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple />
+            <button class="btn btn--danger" type="button" id="btnClearDocs">Clear Docs</button>
+          </div>
+
+          <div class="muted mt12">
+            Changes are saved as you add or remove files. Use <strong>Save</strong> to write storage again and sync to the server if MySQL is enabled. Large files may hit browser storage limits.
+          </div>
+
+          <div class="docsList" id="docsList"></div>
+        </div>
+        <div class="dialog__footer">
+          <button class="btn btn--primary" type="button" id="btnSaveDocs">Save</button>
+          <button class="btn" type="submit" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="tplDocItem">
+      <div class="docItem">
+        <div class="docItem__meta">
+          <div class="docItem__name"></div>
+          <div class="docItem__sub muted"></div>
+        </div>
+        <div class="docItem__actions">
+          <a class="btn btn--ghost docItem__open" target="_blank" rel="noreferrer">View</a>
+          <a class="btn btn--ghost docItem__download" rel="noreferrer">Download</a>
+          <button class="btn btn--danger docItem__remove" type="button">Remove</button>
+        </div>
+      </div>
+    </template>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog class="dialog dialog--login" id="loginDialog">
+      <div class="loginPage">
+        <header class="loginPage__brand">
+          <div class="loginPage__brandTitle">E-Inventory</div>
+          <div class="loginPage__brandSub">Online inventory management system</div>
+        </header>
+
+        <div class="loginPage__panel">
+          <form class="loginCard" id="loginForm" novalidate>
+            <h2 class="loginCard__title">Login</h2>
+
+            <div class="loginField">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </span>
+              <input
+                id="loginUsername"
+                class="loginField__input"
+                type="text"
+                name="username"
+                autocomplete="username"
+                placeholder="Email address"
+                required
+              />
+            </div>
+
+            <div class="loginField">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
+              <input
+                id="loginPassword"
+                class="loginField__input"
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                placeholder="Password"
+                aria-label="Password"
+                required
+              />
+            </div>
+
+            <label class="loginSwitch">
+              <input type="checkbox" id="loginRemember" class="loginSwitch__input" />
+              <span class="loginSwitch__track" aria-hidden="true"></span>
+              <span class="loginSwitch__label">Keep me logged in</span>
+            </label>
+
+            <p class="loginCard__error" id="loginError" role="alert"></p>
+
+            <button type="submit" class="loginCard__submit" id="btnLogin">Log In</button>
+
+            <div class="loginTouch">
+              <button type="button" class="loginTouch__iconBtn" id="btnLoginTouchId" title="Not available in browser">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 11c0 3-1.5 4.5-4 4.5S4 14 4 11V7a1 1 0 0 1 1-1" />
+                  <path d="M8 6V5a4 4 0 0 1 8 0v6c0 3-1.5 4.5-4 4.5" />
+                  <path d="M12 11V3" />
+                  <path d="M16 6v5c0 2.5-1 4-3.5 4" />
+                  <path d="M16 11V8" />
+                  <path d="M20 10.5V11c0 4-2 6.5-6 6.5" />
+                </svg>
+              </button>
+              <span class="loginTouch__caption">Login With TouchID</span>
+            </div>
+          </form>
+
+          <div class="loginArt" aria-hidden="true">
+            <div class="loginArt__blob loginArt__blob--1"></div>
+            <div class="loginArt__blob loginArt__blob--2"></div>
+            <svg class="loginArt__svg" viewBox="0 0 400 320" xmlns="http://www.w3.org/2000/svg">
+              <rect class="loginArt__counter" x="48" y="218" width="304" height="18" rx="4" />
+              <rect class="loginArt__pos" x="200" y="168" width="72" height="52" rx="6" />
+              <rect class="loginArt__posScr" x="206" y="174" width="28" height="20" rx="2" />
+              <rect class="loginArt__posScr" x="238" y="174" width="28" height="20" rx="2" />
+              <rect class="loginArt__posBase" x="214" y="214" width="44" height="8" rx="2" />
+              <!-- figure -->
+              <ellipse class="loginArt__shadow" cx="130" cy="248" rx="36" ry="8" />
+              <path class="loginArt__body" d="M98 208c0-22 14-38 32-38s32 16 32 38v42H98v-42z" />
+              <path class="loginArt__shirt" d="M104 188c8-18 42-18 50 0l-6 62H110l-6-62z" />
+              <path class="loginArt__collar" d="M118 188h24l-4 12h-16l-4-12z" />
+              <circle class="loginArt__head" cx="130" cy="132" r="28" />
+              <path class="loginArt__hair" d="M102 128c4-24 28-36 52-32 10 2 18 10 20 22 2 12-2 22-8 28-4-16-18-26-34-26s-28 10-32 26c-6-8-4-18 2-18z" />
+              <path class="loginArt__arm" d="M168 200c28-8 48-4 62 8l-8 10c-12-10-28-12-48-6l-6-12z" />
+              <circle class="loginArt__hand" cx="228" cy="186" r="8" />
+            </svg>
+          </div>
+        </div>
+
+        <p class="loginPage__copyright" id="loginCopyright"></p>
+      </div>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
