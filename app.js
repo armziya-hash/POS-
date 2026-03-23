@@ -5,6 +5,10 @@ const AUTH_KEY = "vehicle_pos_auth_v1";
 const SESSION_KEY = "vehicle_pos_session_v1";
 /** When "Keep me logged in" is used, session is also stored here (survives browser restart). */
 const SESSION_PERSIST_KEY = "vehicle_pos_session_persist_v1";
+const INVOICE_SENT_TEMPLATE =
+  "Hi {{Customer Name}}, your invoice {{Invoice Number}} for {{Amount}}. Thank you for your business! - {{Company Name}}";
+const INVOICE_SENT_TEMPLATE_OLD =
+  "Hi {{Customer Name}}, your invoice {{Invoice Number}} for {{Amount}} is now available. Thank you for your business! - {{Company Name}}";
 
 const PERMS = {
   INVENTORY_VIEW: "inventory.view",
@@ -175,6 +179,8 @@ function createEmptyDb() {
       companyEmail: "",
       companyWebsite: "",
       invoiceLogoDataUrl: "",
+      invoiceSentAuto: false,
+      invoiceSentTemplate: INVOICE_SENT_TEMPLATE,
       // Inventory report settings are stored per vehicle type.
       // Example: waste/reorderPoint values are user-entered (not derived from sales history).
       inventoryReports: { typeSettings: {} },
@@ -186,6 +192,9 @@ function createEmptyDb() {
     cart: { items: [], discount: 0 },
     sales: [],
     ledger: [],
+    customers: [],
+    garageJobs: [],
+    quotations: [],
   };
 }
 
@@ -385,6 +394,14 @@ function updateMainMenuAccount() {
     <p class="menu__accountSession">Signed in: ${started}</p>`;
 }
 
+function canAccessGarageCustomer() {
+  return can(PERMS.INVENTORY_VIEW) || can(PERMS.BILLING_USE);
+}
+
+function canManageGarageCustomerData() {
+  return can(PERMS.INVENTORY_EDIT) || can(PERMS.BILLING_USE);
+}
+
 function setUserUi() {
   const u = currentUser();
   const pill = $("#userPill");
@@ -435,14 +452,64 @@ function setUserUi() {
   $("#btnClearInvoiceLogo").disabled = !can(PERMS.BRANDING_EDIT);
   $("#companyName").disabled = !can(PERMS.BRANDING_EDIT);
 
+  const btnAddNv = document.querySelector("#btnAddNewVehicle");
+  if (btnAddNv) {
+    const ok = can(PERMS.INVENTORY_EDIT);
+    btnAddNv.hidden = !ok;
+    btnAddNv.disabled = !ok;
+    btnAddNv.title = ok ? "Open add-vehicle form" : "Not allowed";
+  }
+
+  const btnAddGj = document.querySelector("#btnAddNewGarageJob");
+  if (btnAddGj) {
+    const ok = canManageGarageCustomerData();
+    btnAddGj.hidden = !ok;
+    btnAddGj.disabled = !ok;
+    btnAddGj.title = ok ? "Open add-garage-job form" : "Not allowed";
+  }
+
+  const btnAddBroker = document.querySelector("#btnAddNewBroker");
+  if (btnAddBroker) {
+    const ok = isAdmin();
+    btnAddBroker.hidden = !ok;
+    btnAddBroker.disabled = !ok;
+    btnAddBroker.title = ok ? "Open add-broker window" : "Admin only";
+  }
+
+  const btnAddLedger = document.querySelector("#btnAddNewLedgerEntry");
+  if (btnAddLedger) {
+    const ok = can(PERMS.LEDGER_ADD);
+    btnAddLedger.hidden = !ok;
+    btnAddLedger.disabled = !ok;
+    btnAddLedger.title = ok ? "Open add-ledger-entry window" : "Not allowed";
+  }
+
+  const btnAddCustomer = document.querySelector("#btnAddNewCustomer");
+  if (btnAddCustomer) {
+    const ok = canManageGarageCustomerData();
+    btnAddCustomer.hidden = !ok;
+    btnAddCustomer.disabled = !ok;
+    btnAddCustomer.title = ok ? "Open add-customer window" : "Not allowed";
+  }
+
+  const btnAddSupplier = document.querySelector("#btnAddNewSupplier");
+  if (btnAddSupplier) {
+    const ok = isAdmin();
+    btnAddSupplier.hidden = !ok;
+    btnAddSupplier.disabled = !ok;
+    btnAddSupplier.title = ok ? "Open add-supplier window" : "Admin only";
+  }
+
   // Role-based navigation (Home + Main Menu items)
   const allowNav = [
     "home",
     ...(can(PERMS.INVENTORY_VIEW) ? ["inventory"] : []),
     ...(can(PERMS.INVENTORY_VIEW) ? ["inventoryReports"] : []),
     ...(can(PERMS.BILLING_USE) ? ["billing"] : []),
+    ...(can(PERMS.BILLING_USE) ? ["quotation"] : []),
     ...(can(PERMS.LEDGER_VIEW) ? ["ledger"] : []),
-    ...(can(PERMS.REPORTS_VIEW) ? ["reports"] : []),
+    ...(can(PERMS.REPORTS_VIEW) ? ["reports", "soldVehicleReports"] : []),
+    ...(canAccessGarageCustomer() ? ["garage", "customer"] : []),
     ...(can(PERMS.USERS_MANAGE) ? ["users"] : []),
     ...(isAdmin() ? ["brokers", "purchase", "suppliers"] : []),
   ];
@@ -451,6 +518,30 @@ function setUserUi() {
     const key = el.dataset.nav;
     el.hidden = !allowNav.includes(key);
   });
+
+  const homeNavMap = [
+    { sel: "#btnGoInventory", tab: "inventory" },
+    { sel: "#btnHomeBilling", tab: "billing" },
+    { sel: "#btnHomePurchase", tab: "purchase" },
+    { sel: "#btnHomeSupplier", tab: "suppliers" },
+    { sel: "#btnHomeCustomer", tab: "customer" },
+  ];
+  for (const item of homeNavMap) {
+    const btn = document.querySelector(item.sel);
+    if (!btn) continue;
+    const ok = canOpenNav(item.tab);
+    btn.disabled = !ok;
+    btn.hidden = !ok;
+  }
+
+  // If user can't access any report sections, hide the "Reports" submenu.
+  const reportsSubMenu = document.querySelector("#reportsSubMenu");
+  if (reportsSubMenu) {
+    const anyVisible = Array.from(reportsSubMenu.querySelectorAll("[data-nav]")).some(
+      (el) => !el.hidden
+    );
+    reportsSubMenu.hidden = !anyVisible;
+  }
 
   const activeKey = document.querySelector("[data-nav].is-active")?.dataset.nav;
   if (activeKey && !allowNav.includes(activeKey)) setActiveTab("home");
@@ -673,7 +764,7 @@ function renderBrokers() {
     `;
     const actions = tr.querySelector(".actions");
     const btnEdit = mkBtn("Edit", "btn btn--ghost");
-    btnEdit.addEventListener("click", () => fillBrokerForm(b.id));
+    btnEdit.addEventListener("click", () => openBrokerFormDialogForEdit(b.id));
     const btnDel = mkBtn("Delete", "btn btn--danger");
     btnDel.addEventListener("click", () => deleteBroker(b.id));
     actions.append(btnEdit, btnDel);
@@ -706,6 +797,48 @@ function clearBrokerForm() {
   form.reset();
   const idEl = document.querySelector("#brokerId");
   if (idEl) idEl.value = "";
+}
+
+function ensureBrokerDialogMount() {
+  const body = document.querySelector("#brokerFormDialogBody");
+  const form = document.querySelector("#brokerForm");
+  if (!body || !form) return;
+  if (body.contains(form)) return;
+  form.hidden = false;
+  body.innerHTML = "";
+  body.appendChild(form);
+}
+
+function closeBrokerFormDialog() {
+  document.querySelector("#brokerFormDialog")?.close();
+}
+
+function openBrokerFormDialogForNew() {
+  if (!isAdmin()) {
+    toast("Only admin can manage brokers.");
+    return;
+  }
+  ensureBrokerDialogMount();
+  const t = document.querySelector("#brokerFormDialogTitle");
+  if (t) t.textContent = "Add Broker";
+  const b = document.querySelector("#brokerFormDialogBadge");
+  if (b) b.textContent = "New";
+  clearBrokerForm();
+  document.querySelector("#brokerFormDialog")?.showModal();
+}
+
+function openBrokerFormDialogForEdit(id) {
+  if (!isAdmin()) {
+    toast("Only admin can manage brokers.");
+    return;
+  }
+  ensureBrokerDialogMount();
+  const t = document.querySelector("#brokerFormDialogTitle");
+  if (t) t.textContent = "Edit Broker";
+  const b = document.querySelector("#brokerFormDialogBadge");
+  if (b) b.textContent = "Edit";
+  fillBrokerForm(id);
+  document.querySelector("#brokerFormDialog")?.showModal();
 }
 
 function upsertBrokerFromForm(e) {
@@ -741,6 +874,9 @@ function upsertBrokerFromForm(e) {
   persist();
   clearBrokerForm();
   renderBrokers();
+  renderPurchasePartyOptions();
+  renderPurchaseVehicleBrokerOptions();
+  closeBrokerFormDialog();
 }
 
 function deleteBroker(id) {
@@ -755,6 +891,907 @@ function deleteBroker(id) {
   persist();
   clearBrokerForm();
   renderBrokers();
+  renderPurchasePartyOptions();
+  renderPurchaseVehicleBrokerOptions();
+  closeBrokerFormDialog();
+}
+
+function normalizeSupplier(s) {
+  return {
+    id: s.id ?? uid("sup"),
+    name: String(s.name ?? "").trim(),
+    phone: String(s.phone ?? "").trim(),
+    email: String(s.email ?? "").trim(),
+    address: String(s.address ?? "").trim(),
+    notes: String(s.notes ?? "").trim(),
+    createdAt: s.createdAt ?? nowIso(),
+    updatedAt: nowIso(),
+  };
+}
+
+function renderSuppliers() {
+  const table = document.querySelector("#suppliersTable tbody");
+  if (!table) return;
+
+  const q = (document.querySelector("#supplierSearch")?.value || "").trim().toLowerCase();
+  const list = (db.suppliers || [])
+    .slice()
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    .filter((s) => {
+      if (!q) return true;
+      const hay = `${s.name ?? ""} ${s.phone ?? ""} ${s.email ?? ""} ${s.address ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  table.innerHTML = "";
+  for (const s of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(s.name || "")}</strong></td>
+      <td>${escapeHtml(s.phone || "")}</td>
+      <td>${escapeHtml(s.email || "")}</td>
+      <td>${escapeHtml(s.address || "")}</td>
+      <td class="actions"></td>
+    `;
+
+    const actions = tr.querySelector(".actions");
+    const btnEdit = mkBtn("Edit", "btn btn--ghost");
+    btnEdit.addEventListener("click", () => openSupplierFormDialogForEdit(s.id));
+    const btnDel = mkBtn("Delete", "btn btn--danger");
+    btnDel.addEventListener("click", () => deleteSupplier(s.id));
+    actions.append(btnEdit, btnDel);
+    table.appendChild(tr);
+  }
+
+  const summary = document.querySelector("#suppliersSummary");
+  if (summary) summary.textContent = `${list.length} supplier${list.length === 1 ? "" : "s"}`;
+}
+
+function fillSupplierForm(id) {
+  const s = (db.suppliers || []).find((x) => x.id === id);
+  if (!s) return;
+  const form = document.querySelector("#supplierForm");
+  if (!form) return;
+  document.querySelector("#supplierId").value = s.id;
+  document.querySelector("#supplierName").value = s.name || "";
+  document.querySelector("#supplierPhone").value = s.phone || "";
+  document.querySelector("#supplierEmail").value = s.email || "";
+  document.querySelector("#supplierAddress").value = s.address || "";
+  document.querySelector("#supplierNotes").value = s.notes || "";
+}
+
+function clearSupplierForm() {
+  const form = document.querySelector("#supplierForm");
+  if (!form) return;
+  form.reset();
+  const idEl = document.querySelector("#supplierId");
+  if (idEl) idEl.value = "";
+}
+
+function ensureSupplierDialogMount() {
+  const body = document.querySelector("#supplierFormDialogBody");
+  const form = document.querySelector("#supplierForm");
+  if (!body || !form) return;
+  if (body.contains(form)) return;
+  form.hidden = false;
+  body.innerHTML = "";
+  body.appendChild(form);
+}
+
+function closeSupplierFormDialog() {
+  document.querySelector("#supplierFormDialog")?.close();
+}
+
+function openSupplierFormDialogForNew() {
+  if (!isAdmin()) {
+    toast("Only admin can manage suppliers.");
+    return;
+  }
+  ensureSupplierDialogMount();
+  const t = document.querySelector("#supplierFormDialogTitle");
+  if (t) t.textContent = "Add Supplier";
+  const b = document.querySelector("#supplierFormDialogBadge");
+  if (b) b.textContent = "New";
+  clearSupplierForm();
+  document.querySelector("#supplierFormDialog")?.showModal();
+}
+
+function openSupplierFormDialogForEdit(id) {
+  if (!isAdmin()) {
+    toast("Only admin can manage suppliers.");
+    return;
+  }
+  ensureSupplierDialogMount();
+  const t = document.querySelector("#supplierFormDialogTitle");
+  if (t) t.textContent = "Edit Supplier";
+  const b = document.querySelector("#supplierFormDialogBadge");
+  if (b) b.textContent = "Edit";
+  fillSupplierForm(id);
+  document.querySelector("#supplierFormDialog")?.showModal();
+}
+
+function upsertSupplierFromForm(e) {
+  e.preventDefault();
+  requirePerm("save supplier", PERMS.INVENTORY_EDIT);
+  // Suppliers are also admin-only in nav; this keeps action-level consistent.
+  if (!isAdmin()) {
+    toast("Only admin can manage suppliers.");
+    return;
+  }
+
+  const id = document.querySelector("#supplierId").value.trim() || undefined;
+  const payload = {
+    id,
+    name: document.querySelector("#supplierName").value,
+    phone: document.querySelector("#supplierPhone").value,
+    email: document.querySelector("#supplierEmail").value,
+    address: document.querySelector("#supplierAddress").value,
+    notes: document.querySelector("#supplierNotes").value,
+  };
+
+  const s = normalizeSupplier(payload);
+  if (!s.name) {
+    toast("Supplier name is required.");
+    return;
+  }
+
+  db.suppliers = Array.isArray(db.suppliers) ? db.suppliers : [];
+  const idx = db.suppliers.findIndex((x) => x.id === s.id);
+  if (idx >= 0) {
+    s.createdAt = db.suppliers[idx].createdAt;
+    db.suppliers[idx] = s;
+    toast("Supplier updated.");
+  } else {
+    db.suppliers.push(s);
+    toast("Supplier added.");
+  }
+
+  persist();
+  clearSupplierForm();
+  renderSuppliers();
+  renderPurchasePartyOptions();
+  closeSupplierFormDialog();
+}
+
+function deleteSupplier(id) {
+  if (!isAdmin()) {
+    toast("Only admin can delete suppliers.");
+    return;
+  }
+  const s = (db.suppliers || []).find((x) => x.id === id);
+  if (!s) return;
+  if (!confirm(`Delete supplier "${s.name}"?`)) return;
+
+  db.suppliers = (db.suppliers || []).filter((x) => x.id !== id);
+  persist();
+  clearSupplierForm();
+  renderSuppliers();
+  renderPurchasePartyOptions();
+  closeSupplierFormDialog();
+}
+
+function normalizeCustomer(c) {
+  return {
+    id: c.id ?? uid("cus"),
+    name: String(c.name ?? "").trim(),
+    phone: String(c.phone ?? "").trim(),
+    email: String(c.email ?? "").trim(),
+    address: String(c.address ?? "").trim(),
+    notes: String(c.notes ?? "").trim(),
+    createdAt: c.createdAt ?? nowIso(),
+    updatedAt: nowIso(),
+  };
+}
+
+function renderCustomers() {
+  const table = document.querySelector("#customersTable tbody");
+  if (!table) return;
+  const q = (document.querySelector("#customerSearch")?.value || "").trim().toLowerCase();
+  const list = (Array.isArray(db.customers) ? db.customers : [])
+    .slice()
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    .filter((c) => {
+      if (!q) return true;
+      const hay = `${c.name ?? ""} ${c.phone ?? ""} ${c.email ?? ""} ${c.address ?? ""} ${c.notes ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  table.innerHTML = "";
+  for (const c of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(c.name || "")}</strong></td>
+      <td>${escapeHtml(c.phone || "")}</td>
+      <td>${escapeHtml(c.email || "")}</td>
+      <td>${escapeHtml(c.address || "")}</td>
+      <td class="actions"></td>
+    `;
+    const actions = tr.querySelector(".actions");
+    const btnEdit = mkBtn("Edit", "btn btn--ghost");
+    btnEdit.addEventListener("click", () => openCustomerFormDialogForEdit(c.id));
+    const btnDel = mkBtn("Delete", "btn btn--danger");
+    btnDel.addEventListener("click", () => deleteCustomer(c.id));
+    actions.append(btnEdit, btnDel);
+    table.appendChild(tr);
+  }
+
+  const summary = document.querySelector("#customersSummary");
+  if (summary) summary.textContent = `${list.length} customer${list.length === 1 ? "" : "s"}`;
+}
+
+/** Billing: dropdown of saved customers → fills invoice customer name & phone. */
+function renderInvoiceCustomerPick() {
+  const sel = document.querySelector("#invoiceCustomerPick");
+  if (!sel) return;
+  const keep = sel.value;
+  while (sel.options.length > 1) {
+    sel.remove(1);
+  }
+  const list = (Array.isArray(db.customers) ? db.customers : [])
+    .slice()
+    .filter((c) => String(c.name ?? "").trim())
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
+  for (const c of list) {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name || "—";
+    sel.appendChild(opt);
+  }
+  const ids = new Set(list.map((c) => c.id));
+  if (keep && ids.has(keep)) sel.value = keep;
+  else sel.value = "";
+}
+
+function quotationVehicleCandidates() {
+  return (Array.isArray(db.vehicles) ? db.vehicles : [])
+    .slice()
+    .filter((v) => v.status !== "sold")
+    .sort((a, b) => (a.updatedAt ?? "").localeCompare(b.updatedAt ?? ""));
+}
+
+function renderQuotationOptions() {
+  const customerSel = document.querySelector("#quotationCustomerPick");
+  if (customerSel) {
+    const keep = customerSel.value;
+    while (customerSel.options.length > 1) customerSel.remove(1);
+    const customers = (Array.isArray(db.customers) ? db.customers : [])
+      .slice()
+      .filter((c) => String(c.name ?? "").trim())
+      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
+    for (const c of customers) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name || "—";
+      customerSel.appendChild(opt);
+    }
+    const ids = new Set(customers.map((c) => c.id));
+    customerSel.value = keep && ids.has(keep) ? keep : "";
+  }
+
+  const vehicleSel = document.querySelector("#quotationVehiclePick");
+  if (vehicleSel) {
+    const keep = vehicleSel.value;
+    while (vehicleSel.options.length > 1) vehicleSel.remove(1);
+    const vehicles = quotationVehicleCandidates();
+    for (const v of vehicles) {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      const bits = [v.stockNo || "—", vehicleLabel(v) || "—", v.vehicleNumber || "—", formatMoney(v.sellPrice)];
+      opt.textContent = bits.join(" | ");
+      vehicleSel.appendChild(opt);
+    }
+    const ids = new Set(vehicles.map((v) => v.id));
+    vehicleSel.value = keep && ids.has(keep) ? keep : "";
+  }
+}
+
+function getQuotationState() {
+  const customerName = String(document.querySelector("#quotationCustomerName")?.value || "").trim();
+  const customerPhone = String(document.querySelector("#quotationCustomerPhone")?.value || "").trim();
+  const quoteDate = String(document.querySelector("#quotationDate")?.value || "").trim();
+  const validUntil = String(document.querySelector("#quotationValidUntil")?.value || "").trim();
+  const remarks = String(document.querySelector("#quotationRemarks")?.value || "").trim();
+  const vehicleId = String(document.querySelector("#quotationVehiclePick")?.value || "").trim();
+  const v = getVehicleById(vehicleId);
+  const enteredPrice = safeNumber(document.querySelector("#quotationPrice")?.value, NaN);
+  const amount = Number.isFinite(enteredPrice) && enteredPrice >= 0 ? enteredPrice : safeNumber(v?.sellPrice, 0);
+  return { customerName, customerPhone, quoteDate, validUntil, remarks, v, amount };
+}
+
+function quotationMessageText() {
+  const s = getQuotationState();
+  if (!s.v) return "";
+  const lines = [
+    `${db.meta.companyName || "E-Inventory"} Vehicle Quotation`,
+    `Date: ${s.quoteDate || "—"}`,
+    `Valid Until: ${s.validUntil || "—"}`,
+    `Customer: ${s.customerName || "—"}`,
+    `Phone: ${s.customerPhone || "—"}`,
+    "",
+    `Vehicle: ${vehicleLabel(s.v) || "—"}`,
+    `Stock No: ${s.v.stockNo || "—"}`,
+    `Vehicle No: ${s.v.vehicleNumber || "—"}`,
+    `Gear: ${s.v.gearSystem || "—"}`,
+    `Condition: ${s.v.vehicleCondition || "—"}`,
+    `Quoted Price: ${formatMoney(s.amount)}`,
+  ];
+  if (s.remarks) lines.push(`Remarks: ${s.remarks}`);
+  return lines.join("\n");
+}
+
+function normalizeQuotation(q) {
+  return {
+    id: q.id ?? uid("quo"),
+    quoteDate: String(q.quoteDate ?? "").trim(),
+    validUntil: String(q.validUntil ?? "").trim(),
+    customerName: String(q.customerName ?? "").trim(),
+    customerPhone: String(q.customerPhone ?? "").trim(),
+    remarks: String(q.remarks ?? "").trim(),
+    amount: Math.max(0, safeNumber(q.amount, 0)),
+    vehicleId: String(q.vehicleId ?? "").trim(),
+    vehicleSnapshot: {
+      stockNo: String(q.vehicleSnapshot?.stockNo ?? "").trim(),
+      label: String(q.vehicleSnapshot?.label ?? "").trim(),
+      vehicleNumber: String(q.vehicleSnapshot?.vehicleNumber ?? "").trim(),
+      gearSystem: String(q.vehicleSnapshot?.gearSystem ?? "").trim(),
+      vehicleCondition: String(q.vehicleSnapshot?.vehicleCondition ?? "").trim(),
+    },
+    createdAt: q.createdAt ?? nowIso(),
+    updatedAt: nowIso(),
+  };
+}
+
+function quotationToState(q) {
+  const vehicle = {
+    stockNo: q.vehicleSnapshot?.stockNo || "—",
+    vehicleNumber: q.vehicleSnapshot?.vehicleNumber || "—",
+    gearSystem: q.vehicleSnapshot?.gearSystem || "—",
+    vehicleCondition: q.vehicleSnapshot?.vehicleCondition || "—",
+  };
+  return {
+    customerName: q.customerName || "",
+    customerPhone: q.customerPhone || "",
+    quoteDate: q.quoteDate || "",
+    validUntil: q.validUntil || "",
+    remarks: q.remarks || "",
+    amount: safeNumber(q.amount, 0),
+    v: { ...vehicle, make: "", model: "", year: "", _label: q.vehicleSnapshot?.label || "" },
+  };
+}
+
+function buildQuotationMessageFromState(s) {
+  if (!s?.v) return "";
+  const label = s.v._label || vehicleLabel(s.v) || "—";
+  const lines = [
+    `${db.meta.companyName || "E-Inventory"} Vehicle Quotation`,
+    `Date: ${s.quoteDate || "—"}`,
+    `Valid Until: ${s.validUntil || "—"}`,
+    `Customer: ${s.customerName || "—"}`,
+    `Phone: ${s.customerPhone || "—"}`,
+    "",
+    `Vehicle: ${label}`,
+    `Stock No: ${s.v.stockNo || "—"}`,
+    `Vehicle No: ${s.v.vehicleNumber || "—"}`,
+    `Gear: ${s.v.gearSystem || "—"}`,
+    `Condition: ${s.v.vehicleCondition || "—"}`,
+    `Quoted Price: ${formatMoney(s.amount)}`,
+  ];
+  if (s.remarks) lines.push(`Remarks: ${s.remarks}`);
+  return lines.join("\n");
+}
+
+function renderQuotationPreview() {
+  const preview = document.querySelector("#quotationPreview");
+  if (!preview) return;
+  const s = getQuotationState();
+  if (!s.v) {
+    preview.classList.add("muted");
+    preview.innerHTML = "Select customer and vehicle to generate quotation preview.";
+    return;
+  }
+  preview.classList.remove("muted");
+  preview.innerHTML = `
+    <div style="display:grid;gap:8px;">
+      <div><strong>${escapeHtml(db.meta.companyName || "E-Inventory")}</strong></div>
+      <div class="muted">Date: ${escapeHtml(s.quoteDate || "—")} · Valid Until: ${escapeHtml(s.validUntil || "—")}</div>
+      <div><strong>Customer:</strong> ${escapeHtml(s.customerName || "—")} ${s.customerPhone ? `(${escapeHtml(s.customerPhone)})` : ""}</div>
+      <div><strong>Vehicle:</strong> ${escapeHtml(vehicleLabel(s.v) || "—")}</div>
+      <div><strong>Stock No:</strong> ${escapeHtml(s.v.stockNo || "—")} · <strong>Vehicle No:</strong> ${escapeHtml(s.v.vehicleNumber || "—")}</div>
+      <div><strong>Gear:</strong> ${escapeHtml(s.v.gearSystem || "—")} · <strong>Condition:</strong> ${escapeHtml(s.v.vehicleCondition || "—")}</div>
+      <div><strong>Quoted Price:</strong> ${escapeHtml(formatMoney(s.amount))}</div>
+      ${s.remarks ? `<div><strong>Remarks:</strong> ${escapeHtml(s.remarks)}</div>` : ""}
+    </div>
+  `;
+}
+
+function sendQuotationWhatsapp() {
+  requirePerm("quotation", PERMS.BILLING_USE);
+  const s = getQuotationState();
+  if (!s.v) return toast("Select a vehicle first.");
+  const phone = String(s.customerPhone || "").replace(/[^\d]/g, "");
+  if (!phone) return toast("Customer phone is required for WhatsApp.");
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(buildQuotationMessageFromState(s))}`;
+  window.open(url, "_blank");
+}
+
+function printQuotationFromState(s) {
+  if (!s?.v) return toast("Select a vehicle first.");
+  const label = s.v._label || vehicleLabel(s.v) || "—";
+  const w = window.open("", "_blank");
+  if (!w) return toast("Popup blocked. Allow popups to print quotation.");
+  w.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Quotation</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
+          h1 { margin: 0 0 8px; font-size: 20px; }
+          .muted { color: #666; font-size: 12px; }
+          .box { border: 1px solid #e6e6e6; border-radius: 10px; padding: 14px; margin-top: 12px; }
+          .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; }
+          .k { color: #666; }
+          .price { font-size: 20px; font-weight: 700; margin-top: 10px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(db.meta.companyName || "E-Inventory")} · Vehicle Quotation</h1>
+        <div class="muted">Date: ${escapeHtml(s.quoteDate || "—")} · Valid Until: ${escapeHtml(s.validUntil || "—")}</div>
+        <div class="box">
+          <div class="kv">
+            <div class="k">Customer</div><div>${escapeHtml(s.customerName || "—")}</div>
+            <div class="k">Phone</div><div>${escapeHtml(s.customerPhone || "—")}</div>
+            <div class="k">Vehicle</div><div>${escapeHtml(label)}</div>
+            <div class="k">Stock No</div><div>${escapeHtml(s.v.stockNo || "—")}</div>
+            <div class="k">Vehicle No</div><div>${escapeHtml(s.v.vehicleNumber || "—")}</div>
+            <div class="k">Gear</div><div>${escapeHtml(s.v.gearSystem || "—")}</div>
+            <div class="k">Condition</div><div>${escapeHtml(s.v.vehicleCondition || "—")}</div>
+            ${s.remarks ? `<div class="k">Remarks</div><div>${escapeHtml(s.remarks)}</div>` : ""}
+          </div>
+          <div class="price">Quoted Price: ${escapeHtml(formatMoney(s.amount))}</div>
+        </div>
+        <script>window.onload = () => window.print();</script>
+      </body>
+    </html>
+  `);
+  w.document.close();
+}
+
+function printQuotation() {
+  requirePerm("quotation", PERMS.BILLING_USE);
+  const s = getQuotationState();
+  printQuotationFromState(s);
+}
+
+function saveQuotation() {
+  requirePerm("quotation", PERMS.BILLING_USE);
+  const s = getQuotationState();
+  if (!s.v) return toast("Select a vehicle first.");
+  if (!s.customerName) return toast("Customer name is required.");
+  const q = normalizeQuotation({
+    quoteDate: s.quoteDate || todayISODate(),
+    validUntil: s.validUntil || "",
+    customerName: s.customerName,
+    customerPhone: s.customerPhone,
+    remarks: s.remarks,
+    amount: s.amount,
+    vehicleId: s.v.id || "",
+    vehicleSnapshot: {
+      stockNo: s.v.stockNo || "",
+      label: vehicleLabel(s.v) || "",
+      vehicleNumber: s.v.vehicleNumber || "",
+      gearSystem: s.v.gearSystem || "",
+      vehicleCondition: s.v.vehicleCondition || "",
+    },
+  });
+  db.quotations = Array.isArray(db.quotations) ? db.quotations : [];
+  db.quotations.push(q);
+  persist();
+  renderQuotation();
+  toast("Quotation saved.");
+}
+
+function loadQuotationToForm(id) {
+  const q = (db.quotations || []).find((x) => x.id === id);
+  if (!q) return;
+  const qDate = document.querySelector("#quotationDate");
+  const qValid = document.querySelector("#quotationValidUntil");
+  const qName = document.querySelector("#quotationCustomerName");
+  const qPhone = document.querySelector("#quotationCustomerPhone");
+  const qRemarks = document.querySelector("#quotationRemarks");
+  const qPrice = document.querySelector("#quotationPrice");
+  const qVehiclePick = document.querySelector("#quotationVehiclePick");
+  const qCustomerPick = document.querySelector("#quotationCustomerPick");
+  if (qDate) qDate.value = q.quoteDate || "";
+  if (qValid) qValid.value = q.validUntil || "";
+  if (qName) qName.value = q.customerName || "";
+  if (qPhone) qPhone.value = q.customerPhone || "";
+  if (qRemarks) qRemarks.value = q.remarks || "";
+  if (qPrice) qPrice.value = String(safeNumber(q.amount, 0));
+  if (qCustomerPick) qCustomerPick.value = "";
+  if (qVehiclePick && q.vehicleId && Array.from(qVehiclePick.options).some((opt) => opt.value === q.vehicleId)) {
+    qVehiclePick.value = q.vehicleId;
+  } else if (qVehiclePick) {
+    qVehiclePick.value = "";
+  }
+  renderQuotationPreview();
+}
+
+function deleteQuotation(id) {
+  requirePerm("quotation", PERMS.BILLING_USE);
+  const q = (db.quotations || []).find((x) => x.id === id);
+  if (!q) return;
+  if (!confirm(`Delete quotation for "${q.customerName}"?`)) return;
+  db.quotations = (db.quotations || []).filter((x) => x.id !== id);
+  persist();
+  renderQuotation();
+  toast("Quotation deleted.");
+}
+
+function renderQuotationList() {
+  const tbody = document.querySelector("#quotationTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const list = (Array.isArray(db.quotations) ? db.quotations : [])
+    .slice()
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  for (const q of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(q.quoteDate || "—")}</td>
+      <td><strong>${escapeHtml(q.customerName || "—")}</strong><div class="muted">${escapeHtml(q.customerPhone || "")}</div></td>
+      <td><strong>${escapeHtml(q.vehicleSnapshot?.label || "—")}</strong><div class="muted">${escapeHtml(q.vehicleSnapshot?.stockNo || "—")}</div></td>
+      <td>${escapeHtml(q.validUntil || "—")}</td>
+      <td class="num"><strong>${escapeHtml(formatMoney(q.amount))}</strong></td>
+      <td class="actions"></td>
+    `;
+    const actions = tr.querySelector(".actions");
+    const btnLoad = mkBtn("Load", "btn btn--ghost");
+    btnLoad.addEventListener("click", () => loadQuotationToForm(q.id));
+    const btnPrint = mkBtn("Print", "btn");
+    btnPrint.addEventListener("click", () => printQuotationFromState(quotationToState(q)));
+    const btnDel = mkBtn("Delete", "btn btn--danger");
+    btnDel.addEventListener("click", () => deleteQuotation(q.id));
+    actions.append(btnLoad, btnPrint, btnDel);
+    tbody.appendChild(tr);
+  }
+  const summary = document.querySelector("#quotationSummary");
+  if (summary) summary.textContent = `${list.length} quotation${list.length === 1 ? "" : "s"}`;
+}
+
+function renderQuotation() {
+  renderQuotationOptions();
+  renderQuotationPreview();
+  renderQuotationList();
+}
+
+function fillCustomerForm(id) {
+  const c = (db.customers || []).find((x) => x.id === id);
+  if (!c) return;
+  const idEl = document.querySelector("#customerId");
+  if (idEl) idEl.value = c.id;
+  document.querySelector("#crmCustomerName").value = c.name || "";
+  document.querySelector("#crmCustomerPhone").value = c.phone || "";
+  document.querySelector("#customerEmail").value = c.email || "";
+  document.querySelector("#customerAddress").value = c.address || "";
+  document.querySelector("#customerNotes").value = c.notes || "";
+}
+
+function clearCustomerForm() {
+  const form = document.querySelector("#customerForm");
+  if (form) form.reset();
+  const idEl = document.querySelector("#customerId");
+  if (idEl) idEl.value = "";
+}
+
+function ensureCustomerDialogMount() {
+  const body = document.querySelector("#customerFormDialogBody");
+  const form = document.querySelector("#customerForm");
+  if (!body || !form) return;
+  if (body.contains(form)) return;
+  // If the inline form was hidden in the Customer panel, make sure it becomes visible in the dialog.
+  form.hidden = false;
+  body.innerHTML = "";
+  body.appendChild(form);
+}
+
+function closeCustomerFormDialog() {
+  document.querySelector("#customerFormDialog")?.close();
+}
+
+function openCustomerFormDialogForNew() {
+  ensureCustomerDialogMount();
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const t = document.querySelector("#customerFormDialogTitle");
+  if (t) t.textContent = "Add customer";
+  const b = document.querySelector("#customerFormDialogBadge");
+  if (b) b.textContent = "New";
+  clearCustomerForm();
+  document.querySelector("#customerFormDialog")?.showModal();
+}
+
+function openCustomerFormDialogForEdit(id) {
+  ensureCustomerDialogMount();
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const t = document.querySelector("#customerFormDialogTitle");
+  if (t) t.textContent = "Edit customer";
+  const b = document.querySelector("#customerFormDialogBadge");
+  if (b) b.textContent = "Edit";
+  fillCustomerForm(id);
+  document.querySelector("#customerFormDialog")?.showModal();
+}
+
+function upsertCustomerFromForm(e) {
+  e.preventDefault();
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const id = document.querySelector("#customerId")?.value.trim() || undefined;
+  const payload = {
+    id,
+    name: document.querySelector("#crmCustomerName")?.value,
+    phone: document.querySelector("#crmCustomerPhone")?.value,
+    email: document.querySelector("#customerEmail")?.value,
+    address: document.querySelector("#customerAddress")?.value,
+    notes: document.querySelector("#customerNotes")?.value,
+  };
+  const c = normalizeCustomer(payload);
+  if (!c.name) {
+    toast("Customer name is required.");
+    return;
+  }
+  db.customers = Array.isArray(db.customers) ? db.customers : [];
+  const idx = db.customers.findIndex((x) => x.id === c.id);
+  if (idx >= 0) {
+    c.createdAt = db.customers[idx].createdAt;
+    db.customers[idx] = c;
+    toast("Customer updated.");
+  } else {
+    db.customers.push(c);
+    toast("Customer added.");
+  }
+  persist();
+  clearCustomerForm();
+  renderCustomers();
+  renderInvoiceCustomerPick();
+  closeCustomerFormDialog();
+}
+
+function deleteCustomer(id) {
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const c = (db.customers || []).find((x) => x.id === id);
+  if (!c) return;
+  if (!confirm(`Delete customer "${c.name}"?`)) return;
+  db.customers = (db.customers || []).filter((x) => x.id !== id);
+  persist();
+  clearCustomerForm();
+  renderCustomers();
+  renderInvoiceCustomerPick();
+  closeCustomerFormDialog();
+}
+
+function garageJobStockNo(j) {
+  const s = String(j?.stockNo ?? "").trim();
+  if (s) return s;
+  return String(j?.relatedStock ?? "").trim();
+}
+
+function garageJobVehicleRef(j) {
+  return String(j?.vehicleRef ?? "").trim();
+}
+
+function garageJobIsActive(j) {
+  return String(j?.status ?? "")
+    .trim()
+    .toLowerCase() !== "done";
+}
+
+/** True if an open / in-progress garage job references this vehicle by stock no. or vehicle number. */
+function vehicleHasActiveGarageJob(v) {
+  if (!v) return false;
+  const stock = String(v.stockNo ?? "").trim().toLowerCase();
+  const vnum = String(v.vehicleNumber ?? "").trim().toLowerCase();
+  if (!stock && !vnum) return false;
+  const jobs = Array.isArray(db.garageJobs) ? db.garageJobs : [];
+  for (const j of jobs) {
+    if (!garageJobIsActive(j)) continue;
+    const jStock = garageJobStockNo(j).trim().toLowerCase();
+    const jVeh = garageJobVehicleRef(j).trim().toLowerCase();
+    if (stock && jStock && stock === jStock) return true;
+    if (vnum && jVeh && vnum === jVeh) return true;
+  }
+  return false;
+}
+
+/** Garage status column: linked to active garage job (stock no. / vehicle number). */
+function inventoryGarageStatusHtml(v) {
+  return vehicleHasActiveGarageJob(v)
+    ? `<span class="pill pill--garage">In garage</span>`
+    : `<span class="muted">—</span>`;
+}
+
+function normalizeGarageJob(j) {
+  return {
+    id: j.id ?? uid("gjob"),
+    title: String(j.title ?? "").trim(),
+    stockNo: String(j.stockNo ?? "").trim(),
+    vehicleRef: String(j.vehicleRef ?? "").trim(),
+    status: String(j.status ?? "In progress").trim(),
+    notes: String(j.notes ?? "").trim(),
+    createdAt: j.createdAt ?? nowIso(),
+    updatedAt: nowIso(),
+  };
+}
+
+function renderGarageJobs() {
+  const table = document.querySelector("#garageJobsTable tbody");
+  if (!table) return;
+  const q = (document.querySelector("#garageJobSearch")?.value || "").trim().toLowerCase();
+  const list = (Array.isArray(db.garageJobs) ? db.garageJobs : [])
+    .slice()
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .filter((j) => {
+      if (!q) return true;
+      const sn = garageJobStockNo(j);
+      const vr = garageJobVehicleRef(j);
+      const hay = `${j.title ?? ""} ${sn} ${vr} ${j.status ?? ""} ${j.notes ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  table.innerHTML = "";
+  for (const j of list) {
+    const tr = document.createElement("tr");
+    const dt = j.createdAt ? new Date(j.createdAt).toLocaleString() : "—";
+    const sn = garageJobStockNo(j);
+    const vr = garageJobVehicleRef(j);
+    tr.innerHTML = `
+      <td class="muted" style="white-space:nowrap;font-size:12px;">${escapeHtml(dt)}</td>
+      <td><strong>${escapeHtml(j.title || "")}</strong></td>
+      <td>${escapeHtml(sn || "—")}</td>
+      <td>${escapeHtml(vr || "—")}</td>
+      <td><span class="pill">${escapeHtml(j.status || "—")}</span></td>
+      <td class="actions"></td>
+    `;
+    const actions = tr.querySelector(".actions");
+    const btnEdit = mkBtn("Edit", "btn btn--ghost");
+    const canEdit = canManageGarageCustomerData();
+    if (!canEdit) {
+      btnEdit.disabled = true;
+      btnEdit.title = "Not allowed";
+    }
+    btnEdit.addEventListener("click", () => {
+      if (!canEdit) return;
+      openGarageJobFormDialogForEdit(j.id);
+    });
+    const btnDel = mkBtn("Delete", "btn btn--danger");
+    if (!canEdit) {
+      btnDel.disabled = true;
+      btnDel.title = "Not allowed";
+    }
+    btnDel.addEventListener("click", () => {
+      if (!canEdit) return;
+      deleteGarageJob(j.id);
+    });
+    actions.append(btnEdit, btnDel);
+    table.appendChild(tr);
+  }
+
+  const summary = document.querySelector("#garageJobsSummary");
+  if (summary) summary.textContent = `${list.length} job${list.length === 1 ? "" : "s"}`;
+}
+
+function fillGarageJobForm(id) {
+  const j = (db.garageJobs || []).find((x) => x.id === id);
+  if (!j) return;
+  const idEl = document.querySelector("#garageJobId");
+  if (idEl) idEl.value = j.id;
+  document.querySelector("#garageJobTitle").value = j.title || "";
+  document.querySelector("#garageJobStockNo").value = garageJobStockNo(j);
+  document.querySelector("#garageJobVehicleNumber").value = garageJobVehicleRef(j);
+  document.querySelector("#garageJobStatus").value = j.status || "In progress";
+  document.querySelector("#garageJobNotes").value = j.notes || "";
+}
+
+function clearGarageJobForm() {
+  const form = document.querySelector("#garageJobForm");
+  if (form) form.reset();
+  const idEl = document.querySelector("#garageJobId");
+  if (idEl) idEl.value = "";
+  const st = document.querySelector("#garageJobStatus");
+  if (st) st.value = "In progress";
+}
+
+function closeGarageJobFormDialog() {
+  document.querySelector("#garageJobFormDialog")?.close();
+}
+
+function openGarageJobFormDialogForNew() {
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const mode = document.querySelector("#garageJobFormDialogModeBadge");
+  if (mode) mode.textContent = "New";
+  clearGarageJobForm();
+  document.querySelector("#garageJobFormDialog")?.showModal();
+}
+
+function openGarageJobFormDialogForEdit(id) {
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const j = (db.garageJobs || []).find((x) => x.id === id);
+  if (!j) return;
+  const mode = document.querySelector("#garageJobFormDialogModeBadge");
+  if (mode) mode.textContent = "Edit";
+  fillGarageJobForm(id);
+  document.querySelector("#garageJobFormDialog")?.showModal();
+}
+
+function upsertGarageJobFromForm(e) {
+  e.preventDefault();
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const id = document.querySelector("#garageJobId")?.value.trim() || undefined;
+  const payload = {
+    id,
+    title: document.querySelector("#garageJobTitle")?.value,
+    stockNo: document.querySelector("#garageJobStockNo")?.value,
+    vehicleRef: document.querySelector("#garageJobVehicleNumber")?.value,
+    status: document.querySelector("#garageJobStatus")?.value,
+    notes: document.querySelector("#garageJobNotes")?.value,
+  };
+  const j = normalizeGarageJob(payload);
+  if (!j.title) {
+    toast("Job title is required.");
+    return;
+  }
+  db.garageJobs = Array.isArray(db.garageJobs) ? db.garageJobs : [];
+  const idx = db.garageJobs.findIndex((x) => x.id === j.id);
+  if (idx >= 0) {
+    j.createdAt = db.garageJobs[idx].createdAt;
+    db.garageJobs[idx] = j;
+    toast("Job updated.");
+  } else {
+    db.garageJobs.push(j);
+    toast("Job logged.");
+  }
+  persist();
+  clearGarageJobForm();
+  renderGarageJobs();
+  renderInventory();
+  closeGarageJobFormDialog();
+}
+
+function deleteGarageJob(id) {
+  if (!canManageGarageCustomerData()) {
+    toast("Not allowed.");
+    return;
+  }
+  const j = (db.garageJobs || []).find((x) => x.id === id);
+  if (!j) return;
+  if (!confirm(`Delete job "${j.title}"?`)) return;
+  db.garageJobs = (db.garageJobs || []).filter((x) => x.id !== id);
+  persist();
+  clearGarageJobForm();
+  renderGarageJobs();
+  renderInventory();
+  closeGarageJobFormDialog();
 }
 
 async function createUserFromForm(e) {
@@ -915,6 +1952,7 @@ function normalizeVehicle(v) {
     countryOfOrigin: String(v.countryOfOrigin ?? "").trim(),
     mileageKm: v.mileageKm === "" || v.mileageKm == null ? null : safeNumber(v.mileageKm, null),
     fuelType: String(v.fuelType ?? "").trim(),
+    gearSystem: String(v.gearSystem ?? "").trim(),
     vehicleCondition: String(v.vehicleCondition ?? "").trim(),
     leasingStatus: String(v.leasingStatus ?? "No").trim(),
     leasingCompany: String(v.leasingCompany ?? "").trim(),
@@ -960,9 +1998,12 @@ function canOpenNav(tab) {
   if (tab === "inventory") return can(PERMS.INVENTORY_VIEW);
   if (tab === "inventoryReports") return can(PERMS.INVENTORY_VIEW);
   if (tab === "billing") return can(PERMS.BILLING_USE);
+  if (tab === "quotation") return can(PERMS.BILLING_USE);
   if (tab === "ledger") return can(PERMS.LEDGER_VIEW);
   if (tab === "reports") return can(PERMS.REPORTS_VIEW);
+  if (tab === "soldVehicleReports") return can(PERMS.REPORTS_VIEW);
   if (tab === "users") return can(PERMS.USERS_MANAGE);
+  if (tab === "garage" || tab === "customer") return canAccessGarageCustomer();
   // For now these are admin-only modules
   if (tab === "brokers") return isAdmin();
   if (tab === "suppliers") return isAdmin();
@@ -971,16 +2012,93 @@ function canOpenNav(tab) {
 }
 
 function initNav() {
+  const mm = document.querySelector("#mainMenu");
   const go = (tab) => {
     if (!canOpenNav(tab)) return toast(`No permission: ${tab}`);
     setActiveTab(tab);
-    const mm = document.querySelector("#mainMenu");
+    if (tab === "purchase") {
+      renderPurchaseVehicleBrokerOptions();
+      renderPurchasePartyOptions();
+    }
     if (mm?.open) mm.open = false;
   };
 
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.addEventListener("click", () => go(el.dataset.nav));
   });
+
+  // Close main menu when user clicks anywhere outside it.
+  document.addEventListener("click", (e) => {
+    if (!mm?.open) return;
+    if (mm.contains(e.target)) return;
+    mm.open = false;
+  });
+}
+
+function closeVehicleFormDialog() {
+  document.querySelector("#vehicleFormDialog")?.close();
+}
+
+function openVehicleFormDialogForNew() {
+  if (!can(PERMS.INVENTORY_EDIT)) {
+    toast("No permission: add vehicle");
+    return;
+  }
+  resetVehicleForm();
+  document.querySelector("#vehicleFormDialog")?.showModal();
+  updateLeaseSectionVisibility();
+}
+
+function openVehicleFormDialogForEdit(v) {
+  if (!can(PERMS.INVENTORY_EDIT)) {
+    toast("No permission: edit vehicle");
+    return;
+  }
+  fillVehicleForm(v);
+  document.querySelector("#vehicleFormDialog")?.showModal();
+  updateLeaseSectionVisibility();
+  toast("Loaded vehicle for edit.");
+}
+
+function closePurchaseFormDialog() {
+  document.querySelector("#purchaseFormDialog")?.close();
+}
+
+function openPurchaseFormDialogForNew() {
+  if (!isAdmin()) {
+    toast("Only admin can record purchases.");
+    return;
+  }
+  resetPurchaseForm();
+  document.querySelector("#purchaseFormDialog")?.showModal();
+}
+
+function ensureLedgerEntryDialogMount() {
+  const body = document.querySelector("#ledgerEntryDialogBody");
+  const form = document.querySelector("#ledgerForm");
+  if (!body || !form) return;
+  if (body.contains(form)) return;
+  body.innerHTML = "";
+  body.appendChild(form);
+}
+
+function closeLedgerEntryDialog() {
+  document.querySelector("#ledgerEntryDialog")?.close();
+}
+
+function openLedgerEntryDialogForNew() {
+  ensureLedgerEntryDialogMount();
+  if (!can(PERMS.LEDGER_ADD)) {
+    toast("No permission: add ledger entry");
+    return;
+  }
+  const t = document.querySelector("#ledgerEntryDialogTitle");
+  if (t) t.textContent = "Add Ledger Entry";
+  const b = document.querySelector("#ledgerEntryDialogBadge");
+  if (b) b.textContent = "Manual";
+  $("#ledgerForm").reset();
+  $("#ledgerDate").value = todayISODate();
+  document.querySelector("#ledgerEntryDialog")?.showModal();
 }
 
 function resetVehicleForm() {
@@ -1012,6 +2130,7 @@ function fillVehicleForm(v) {
   $("#countryOfOrigin").value = v.countryOfOrigin ?? "";
   $("#mileageKm").value = v.mileageKm ?? "";
   $("#fuelType").value = v.fuelType ?? "";
+  $("#gearSystem").value = v.gearSystem ?? "";
   $("#vehicleCondition").value = v.vehicleCondition ?? "";
   $("#leasingStatus").value = v.leasingStatus || "No";
   $("#leasingCompany").value = v.leasingCompany || "";
@@ -1030,7 +2149,7 @@ function fillVehicleForm(v) {
 
 function inventoryMatchesQuery(v, q) {
   if (!q) return true;
-  const hay = `${v.stockNo} ${v.vin} ${v.make} ${v.model} ${v.year ?? ""} ${v.color} ${v.vehicleNumber ?? ""} ${v.vehicleType ?? ""} ${v.brokerName ?? ""} ${v.countryOfOrigin ?? ""} ${v.fuelType ?? ""} ${v.vehicleCondition ?? ""} ${v.engineCc ?? ""} ${v.mileageKm ?? ""}`.toLowerCase();
+  const hay = `${v.stockNo} ${v.vin} ${v.make} ${v.model} ${v.year ?? ""} ${v.color} ${v.vehicleNumber ?? ""} ${v.vehicleType ?? ""} ${v.brokerName ?? ""} ${v.countryOfOrigin ?? ""} ${v.fuelType ?? ""} ${v.gearSystem ?? ""} ${v.vehicleCondition ?? ""} ${v.engineCc ?? ""} ${v.mileageKm ?? ""}`.toLowerCase();
   return hay.includes(q.toLowerCase());
 }
 
@@ -1040,22 +2159,16 @@ function renderInventory() {
   const q = $("#inventorySearch").value.trim();
   const statusFilter = $("#inventoryFilterStatus").value;
 
-  // overall counts (not affected by current filter)
-  const totalAll = db.vehicles.length;
-  const availableAll = db.vehicles.filter((v) => v.status === "available").length;
-  const soldAll = db.vehicles.filter((v) => v.status === "sold").length;
+  const inInventory = db.vehicles.filter((v) => v.status !== "sold");
+  const totalAll = inInventory.length;
   const totalEl = document.querySelector("#invCountTotal");
-  const availBtn = document.querySelector("#btnShowAvailable");
-  const soldBtn = document.querySelector("#btnShowSold");
   if (totalEl) totalEl.textContent = `Total: ${totalAll}`;
-  if (availBtn) availBtn.textContent = `Available: ${availableAll}`;
-  if (soldBtn) soldBtn.textContent = `Sold: ${soldAll}`;
 
-  const list = db.vehicles
+  const list = inInventory
     .slice()
     .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
     .filter((v) => inventoryMatchesQuery(v, q))
-    .filter((v) => (statusFilter === "all" ? true : v.status === statusFilter));
+    .filter((v) => (statusFilter === "available" ? v.status === "available" : true));
 
   for (const v of list) {
     const tr = document.createElement("tr");
@@ -1068,7 +2181,7 @@ function renderInventory() {
       <td class="num"><strong>${yearDisp}</strong></td>
       <td><strong>${escapeHtml(String(v.make || "").trim() || "—")}</strong></td>
       <td><strong>${escapeHtml(String(v.model || "").trim() || "—")}</strong></td>
-      <td>${v.status === "sold" ? `<span class="pill pill--warn">SOLD</span>` : `<span class="pill pill--ok">AVAILABLE</span>`}</td>
+      <td>${inventoryGarageStatusHtml(v)}</td>
       <td class="num"><strong>${formatMoney(v.sellPrice)}</strong><div class="muted" style="margin-top:6px;">Cost: ${formatMoney(v.costPrice)}</div></td>
       <td><span class="pill">${docsCount} file${docsCount === 1 ? "" : "s"}</span></td>
       <td class="actions"></td>
@@ -1078,9 +2191,14 @@ function renderInventory() {
     actionsTd.classList.add("invActions");
 
     const btnEdit = mkBtn("Edit", "btn btn--inv");
+    if (!can(PERMS.INVENTORY_EDIT)) {
+      btnEdit.disabled = true;
+      btnEdit.classList.add("btn--inv-muted");
+      btnEdit.title = "No permission to edit";
+    }
     btnEdit.addEventListener("click", () => {
-      fillVehicleForm(v);
-      toast("Loaded vehicle for edit.");
+      if (!can(PERMS.INVENTORY_EDIT)) return;
+      openVehicleFormDialogForEdit(v);
     });
 
     const btnView = mkBtn("View", "btn btn--inv");
@@ -1112,6 +2230,83 @@ function renderInventory() {
   }
 
   $("#inventorySummary").textContent = `${list.length} vehicle${list.length === 1 ? "" : "s"}`;
+}
+
+function renderSoldVehicleReports() {
+  const tbody = document.querySelector("#soldVehiclesTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const q = (document.querySelector("#soldVehicleSearch")?.value || "").trim().toLowerCase();
+  const soldById = new Map((db.vehicles || []).filter((v) => v.status === "sold").map((v) => [v.id, v]));
+
+  const rows = (db.sales || [])
+    .slice()
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
+    .flatMap((s) =>
+      (s.items || []).map((it) => {
+        const v = soldById.get(it.vehicleId);
+        return {
+          createdAt: s.createdAt || "",
+          invoiceNo: s.invoiceNo || "",
+          vehicleId: it.vehicleId || "",
+          stockNo: v?.stockNo || it.stockNo || "",
+          vin: v?.vin || it.vin || "",
+          year: v?.year ?? it.year ?? "",
+          make: v?.make || it.make || "",
+          model: v?.model || it.model || "",
+          vehicleNumber: v?.vehicleNumber || it.vehicleNumber || "",
+          gearSystem: v?.gearSystem || it.gearSystem || "",
+          imageDataUrl: v?.imageDataUrl || "",
+          docsCount: Array.isArray(v?.docs) ? v.docs.length : 0,
+          customer: s.customer?.name || "Walk-in",
+          soldPrice: safeNumber(it.sellPrice, v?.sellPrice ?? 0),
+        };
+      })
+    )
+    .filter((r) => {
+      if (!q) return true;
+      const hay = `${r.invoiceNo} ${r.stockNo} ${r.vin} ${r.year} ${r.make} ${r.model} ${r.vehicleNumber} ${r.gearSystem} ${r.customer}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    const yearDisp = r.year != null && r.year !== "" ? escapeHtml(String(r.year)) : "—";
+    tr.innerHTML = `
+      <td>${r.imageDataUrl ? `<img class="thumb" alt="img" src="${escapeAttr(r.imageDataUrl)}" />` : `<div class="thumb thumb--empty">NO IMG</div>`}</td>
+      <td><span class="pill">${escapeHtml(r.stockNo || "—")}</span><div class="muted" style="margin-top:6px;font-family:var(--mono);font-size:12px;">${escapeHtml(r.vin || "—")}</div></td>
+      <td class="num"><strong>${yearDisp}</strong></td>
+      <td><strong>${escapeHtml(String(r.make || "").trim() || "—")}</strong></td>
+      <td><strong>${escapeHtml(String(r.model || "").trim() || "—")}</strong></td>
+      <td>${escapeHtml(r.vehicleNumber || "—")}</td>
+      <td>${escapeHtml(r.gearSystem || "—")}</td>
+      <td><span class="pill">${r.docsCount} file${r.docsCount === 1 ? "" : "s"}</span></td>
+      <td>${escapeHtml(r.customer || "Walk-in")}</td>
+      <td><span class="pill">${escapeHtml(r.invoiceNo || "—")}</span></td>
+      <td>${escapeHtml(r.createdAt ? new Date(r.createdAt).toLocaleString() : "—")}</td>
+      <td class="num"><strong>${formatMoney(r.soldPrice)}</strong></td>
+      <td class="actions"></td>
+    `;
+    const actions = tr.querySelector(".actions");
+    const vehicle = r.vehicleId ? getVehicleById(r.vehicleId) : null;
+    const btnView = mkBtn("View", "btn btn--ghost");
+    const btnDocs = mkBtn("Docs", "btn btn--ghost");
+    if (!vehicle) {
+      btnView.disabled = true;
+      btnDocs.disabled = true;
+      btnView.title = "Vehicle details not available";
+      btnDocs.title = "Vehicle documents not available";
+    } else {
+      btnView.addEventListener("click", () => viewVehicleDetails(vehicle.id));
+      btnDocs.addEventListener("click", () => openDocsDialog(vehicle.id));
+    }
+    actions.append(btnView, btnDocs);
+    tbody.appendChild(tr);
+  }
+
+  const summary = document.querySelector("#soldVehiclesSummary");
+  if (summary) summary.textContent = `${rows.length} sold vehicle${rows.length === 1 ? "" : "s"}`;
 }
 
 function viewVehicleDetails(vehicleId) {
@@ -1189,6 +2384,7 @@ function viewVehicleDetails(vehicleId) {
               <div class="k">Type</div><div class="v">${escapeHtml(v.vehicleType || "—")}</div>
               <div class="k">Broker</div><div class="v">${escapeHtml(v.brokerName || "—")}</div>
               <div class="k">Fuel</div><div class="v">${escapeHtml(v.fuelType || "—")}</div>
+              <div class="k">Gear</div><div class="v">${escapeHtml(v.gearSystem || "—")}</div>
               <div class="k">Condition</div><div class="v">${escapeHtml(v.vehicleCondition || "—")}</div>
               <div class="k">Engine CC</div><div class="v">${escapeHtml(v.engineCc ?? "—")}</div>
               <div class="k">Mileage</div><div class="v">${escapeHtml(v.mileageKm ?? "—")} km</div>
@@ -1234,6 +2430,250 @@ function viewVehicleDetails(vehicleId) {
   w.document.close();
 }
 
+function openHomeVehicleQuickWindow(v) {
+  const w = window.open("", "_blank", "width=980,height=680");
+  if (!w) {
+    toast("Popup blocked. Allow popups to view vehicle details.");
+    return;
+  }
+  const year = v.year != null && v.year !== "" ? String(v.year) : "—";
+  const imageHtml = v.imageDataUrl
+    ? `<img src="${escapeAttr(v.imageDataUrl)}" alt="Vehicle" style="max-width:220px;max-height:140px;object-fit:contain;border:1px solid #ddd;border-radius:10px;background:#f6f6f6;" />`
+    : `<div style="width:220px;height:140px;border:1px solid #ddd;border-radius:10px;display:grid;place-items:center;color:#666;background:#fafafa;">NO IMG</div>`;
+  w.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Vehicle Quick View</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 16px; color: #111; }
+          h1 { margin: 0 0 10px; font-size: 18px; }
+          .muted { color: #666; font-size: 12px; }
+          .row { display: grid; grid-template-columns: 240px 1fr; gap: 14px; align-items: start; }
+          .box { border: 1px solid #e6e6e6; border-radius: 10px; padding: 12px; background: #fff; }
+          .kv { display: grid; grid-template-columns: 140px 1fr; gap: 7px 10px; font-size: 13px; }
+          .k { color: #666; }
+        </style>
+      </head>
+      <body>
+        <h1>Vehicle Quick View</h1>
+        <div class="row">
+          <div class="box">${imageHtml}</div>
+          <div class="box kv">
+            <div class="k">Stock No</div><div>${escapeHtml(v.stockNo || "—")}</div>
+            <div class="k">VIN</div><div>${escapeHtml(v.vin || "—")}</div>
+            <div class="k">Year</div><div>${escapeHtml(year)}</div>
+            <div class="k">Make</div><div>${escapeHtml(v.make || "—")}</div>
+            <div class="k">Model</div><div>${escapeHtml(v.model || "—")}</div>
+            <div class="k">Vehicle Number</div><div>${escapeHtml(v.vehicleNumber || "—")}</div>
+            <div class="k">Gear</div><div>${escapeHtml(v.gearSystem || "—")}</div>
+            <div class="k">Condition</div><div>${escapeHtml(v.vehicleCondition || "—")}</div>
+            <div class="k">Selling Price</div><div><strong>${formatMoney(v.sellPrice)}</strong></div>
+          </div>
+        </div>
+      </body>
+    </html>
+  `);
+  w.document.close();
+}
+
+function renderHomeVehicleSearchResults() {
+  const tbody = document.querySelector("#homeVehicleSearchTable tbody");
+  const summary = document.querySelector("#homeVehicleSearchSummary");
+  const input = document.querySelector("#homeVehicleSearch");
+  if (!tbody || !summary || !input) return;
+  const q = String(input.value || "").trim().toLowerCase();
+  tbody.innerHTML = "";
+  if (!q) {
+    summary.textContent = "Type Stock No or Vehicle Number";
+    return;
+  }
+  const list = (db.vehicles || [])
+    .filter((v) => String(v.stockNo || "").toLowerCase().includes(q) || String(v.vehicleNumber || "").toLowerCase().includes(q))
+    .slice(0, 30);
+  for (const v of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><button class="btn btn--ghost js-home-open-stock" type="button">${escapeHtml(v.stockNo || "—")}</button></td>
+      <td><button class="btn btn--ghost js-home-open-vehno" type="button">${escapeHtml(v.vehicleNumber || "—")}</button></td>
+      <td>${escapeHtml(vehicleLabel(v) || "—")}</td>
+      <td class="actions"></td>
+    `;
+    tr.querySelector(".js-home-open-stock")?.addEventListener("click", () => openHomeVehicleQuickWindow(v));
+    tr.querySelector(".js-home-open-vehno")?.addEventListener("click", () => openHomeVehicleQuickWindow(v));
+    const actions = tr.querySelector(".actions");
+    const btnOpen = mkBtn("Open", "btn");
+    btnOpen.addEventListener("click", () => openHomeVehicleQuickWindow(v));
+    actions?.append(btnOpen);
+    tbody.appendChild(tr);
+  }
+  summary.textContent = list.length ? `${list.length} result${list.length === 1 ? "" : "s"}` : "No vehicle found.";
+}
+
+function openHomeVehicleSearchResultsWindow() {
+  const input = document.querySelector("#homeVehicleSearch");
+  if (!input) return;
+  const q = String(input.value || "").trim().toLowerCase();
+  if (!q) {
+    toast("Type Stock No or Vehicle Number.");
+    return;
+  }
+  const salesById = new Map((db.sales || []).map((s) => [s.id, s]));
+
+  const purchaseLatestByStockNo = new Map();
+  const purchaseLatestByVehicleNumber = new Map();
+  for (const p of Array.isArray(db.purchases) ? db.purchases : []) {
+    const pv = purchaseRecordVehicle(p);
+    const stockNo = String(pv.stockNo || "").trim();
+    const vnum = String(pv.vehicleNumber || "").trim();
+    const purchaseDate = String(p.purchaseDate || "").trim();
+    const createdAt = String(p.createdAt || "").trim();
+    const score = `${purchaseDate || "0000-00-00"}|${createdAt || ""}`;
+    if (stockNo) {
+      const cur = purchaseLatestByStockNo.get(stockNo);
+      if (!cur || score > cur.score) purchaseLatestByStockNo.set(stockNo, { purchaseDate, score });
+    }
+    if (vnum) {
+      const cur = purchaseLatestByVehicleNumber.get(vnum);
+      if (!cur || score > cur.score) purchaseLatestByVehicleNumber.set(vnum, { purchaseDate, score });
+    }
+  }
+
+  const garageLatestByStockNo = new Map();
+  const garageLatestByVehicleNumber = new Map();
+  for (const j of Array.isArray(db.garageJobs) ? db.garageJobs : []) {
+    const sn = garageJobStockNo(j);
+    const vr = garageJobVehicleRef(j);
+    const createdAt = String(j.createdAt || "").trim();
+    const score = createdAt || "";
+    if (sn) {
+      const cur = garageLatestByStockNo.get(sn);
+      if (!cur || score > cur.score) garageLatestByStockNo.set(sn, { createdAt, title: j.title || "", score });
+    }
+    if (vr) {
+      const cur = garageLatestByVehicleNumber.get(vr);
+      if (!cur || score > cur.score) garageLatestByVehicleNumber.set(vr, { createdAt, title: j.title || "", score });
+    }
+  }
+
+  const list = (db.vehicles || [])
+    .filter((v) => String(v.stockNo || "").toLowerCase().includes(q) || String(v.vehicleNumber || "").toLowerCase().includes(q))
+    .slice(0, 100)
+    .map((v) => ({
+      stockNo: v.stockNo || "—",
+      vehicleNumber: v.vehicleNumber || "—",
+      vehicle: vehicleLabel(v) || "—",
+      vin: v.vin || "—",
+      year: v.year ?? "—",
+      make: v.make || "—",
+      model: v.model || "—",
+      gear: v.gearSystem || "—",
+      condition: v.vehicleCondition || "—",
+      sellPrice: formatMoney(v.sellPrice),
+      imageDataUrl: v.imageDataUrl || "",
+      // Inventory: purchase date + ready-to-sell
+      inventoryPurchaseDate:
+        purchaseLatestByStockNo.get(String(v.stockNo || "").trim())?.purchaseDate ||
+        purchaseLatestByVehicleNumber.get(String(v.vehicleNumber || "").trim())?.purchaseDate ||
+        "",
+      readyToSell: v.status !== "sold" && !vehicleHasActiveGarageJob(v) ? "Yes" : "No",
+      // Garage: last job sent to garage + title
+      garageSentToDate:
+        garageLatestByStockNo.get(String(v.stockNo || "").trim())?.createdAt ||
+        garageLatestByVehicleNumber.get(String(v.vehicleNumber || "").trim())?.createdAt ||
+        "",
+      garageTitle:
+        garageLatestByStockNo.get(String(v.stockNo || "").trim())?.title ||
+        garageLatestByVehicleNumber.get(String(v.vehicleNumber || "").trim())?.title ||
+        "",
+      // Sold: sold date + customer name
+      soldDate: v.soldAt ? String(v.soldAt) : "",
+      soldCustomerName:
+        v.saleId && salesById.get(v.saleId)?.customer?.name
+          ? salesById.get(v.saleId).customer.name
+          : "",
+    }));
+
+  const w = window.open("", "_blank", "width=980,height=680");
+  if (!w) {
+    toast("Popup blocked. Allow popups to view search results.");
+    return;
+  }
+
+  const payload = JSON.stringify(list).replace(/</g, "\\u003c");
+  w.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Vehicle Search Results</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 16px; color: #111; }
+          h1 { margin: 0 0 6px; font-size: 18px; }
+          .muted { color: #666; font-size: 12px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+          th, td { border-bottom: 1px solid #e6e6e6; padding: 10px; text-align: left; vertical-align: top; }
+          th { background: #f8fafc; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+          .btn { border: 1px solid #d1d5db; border-radius: 8px; background: #fff; padding: 6px 10px; cursor: pointer; }
+          .btn:hover { background: #f8fafc; }
+          .num { text-align: right; }
+        </style>
+      </head>
+      <body>
+        <h1>Vehicle Search Results</h1>
+        <div class="muted">Search: ${escapeHtml(input.value || "")} · ${list.length} result${list.length === 1 ? "" : "s"}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Stock No</th>
+              <th>Vehicle Number</th>
+              <th>Vehicle</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <script>
+          const rows = ${payload};
+          const tbody = document.getElementById("rows");
+          function esc(v){
+            return String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+          }
+          function openDetail(i){
+            const v = rows[i];
+            const ww = window.open("", "_blank", "width=920,height=640");
+            if(!ww) return;
+            const imageHtml = v.imageDataUrl
+              ? '<img src="' + esc(v.imageDataUrl) + '" alt="Vehicle" style="max-width:220px;max-height:140px;object-fit:contain;border:1px solid #ddd;border-radius:10px;background:#f6f6f6;" />'
+              : '<div style="width:220px;height:140px;border:1px solid #ddd;border-radius:10px;display:grid;place-items:center;color:#666;background:#fafafa;">NO IMG</div>';
+            const invPurchase = v.inventoryPurchaseDate ? new Date(v.inventoryPurchaseDate).toLocaleDateString() : "—";
+            const garageDate = v.garageSentToDate ? new Date(v.garageSentToDate).toLocaleDateString() : "—";
+            const soldDate = v.soldDate ? new Date(v.soldDate).toLocaleDateString() : "—";
+            const soldCustomer = v.soldCustomerName || "—";
+            ww.document.write('<!doctype html><html><head><meta charset="utf-8"/><title>Vehicle Quick View</title><style>body{font-family:Arial,sans-serif;padding:16px;color:#111}.row{display:grid;grid-template-columns:240px 1fr;gap:14px}.box{border:1px solid #e6e6e6;border-radius:10px;padding:12px}.kv{display:grid;grid-template-columns:140px 1fr;gap:7px 10px;font-size:13px}.k{color:#666}h1{margin:0 0 10px;font-size:18px}</style></head><body><h1>Vehicle Quick View</h1><div class="row"><div class="box">'+imageHtml+'</div><div class="box kv"><div class="k">Stock No</div><div>'+esc(v.stockNo)+'</div><div class="k">VIN</div><div>'+esc(v.vin)+'</div><div class="k">Year</div><div>'+esc(v.year)+'</div><div class="k">Make</div><div>'+esc(v.make)+'</div><div class="k">Model</div><div>'+esc(v.model)+'</div><div class="k">Vehicle Number</div><div>'+esc(v.vehicleNumber)+'</div><div class="k">Gear</div><div>'+esc(v.gear)+'</div><div class="k">Condition</div><div>'+esc(v.condition)+'</div><div class="k">Selling Price</div><div><strong>'+esc(v.sellPrice)+'</strong></div><div class="k">Inventory Purchase Date</div><div>'+esc(invPurchase)+'</div><div class="k">Ready to Sell</div><div>'+esc(v.readyToSell || "No")+'</div><div class="k">Sent to Garage Date</div><div>'+esc(garageDate)+'</div><div class="k">Garage Title</div><div>'+esc(v.garageTitle || "—")+'</div><div class="k">Sold Date</div><div>'+esc(soldDate)+'</div><div class="k">Sold Customer</div><div>'+esc(soldCustomer)+'</div></div></div></body></html>');
+            ww.document.close();
+          }
+          if(!rows.length){
+            tbody.innerHTML = '<tr><td colspan="4" class="muted">No vehicle found.</td></tr>';
+          } else {
+            tbody.innerHTML = rows.map((v, i) => '<tr><td>'+esc(v.stockNo)+'</td><td>'+esc(v.vehicleNumber)+'</td><td>'+esc(v.vehicle)+'</td><td><button class="btn" type="button" onclick="openDetail('+i+')">Open</button></td></tr>').join("");
+          }
+        </script>
+      </body>
+    </html>
+  `);
+  w.document.close();
+}
+
+function openHomeQuickTab(tab) {
+  if (!canOpenNav(tab)) {
+    toast(`No permission: ${tab}`);
+    return;
+  }
+  setActiveTab(tab);
+}
+
 function renderInventoryReports() {
   const table = document.querySelector("#inventoryReportsTable");
   if (!table) return;
@@ -1250,7 +2690,6 @@ function renderInventoryReports() {
   const sortedTypes = Array.from(types).sort((a, b) => a.localeCompare(b));
 
   let totalOnHandCount = 0;
-  let totalWaste = 0;
   let totalCost = 0;
   let totalSell = 0;
 
@@ -1258,34 +2697,21 @@ function renderInventoryReports() {
     const onHand = db.vehicles.filter((v) => v.status === "available" && inventoryTypeKey(v.vehicleType) === type);
     const stockOnHandCount = onHand.length;
 
-    const waste = safeNumber(typeSettings[type]?.waste, 0);
-    const reorderPoint = safeNumber(typeSettings[type]?.reorderPoint, 0);
-    const effectiveStock = stockOnHandCount - waste;
-    const reorderNeeded = effectiveStock <= reorderPoint;
-
     const totalCostPrice = onHand.reduce((s, v) => s + safeNumber(v.costPrice, 0), 0);
     const totalSellingPrice = onHand.reduce((s, v) => s + safeNumber(v.sellPrice, 0), 0);
 
     totalOnHandCount += stockOnHandCount;
-    totalWaste += waste;
     totalCost += totalCostPrice;
     totalSell += totalSellingPrice;
-
-    const wasteInput = `<input type="number" min="0" step="1" data-inv-field="waste" data-inv-type="${escapeAttr(
-      type
-    )}" value="${waste}" style="width:90px;" />`;
-    const reorderInput = `<input type="number" min="0" step="1" data-inv-field="reorderPoint" data-inv-type="${escapeAttr(
-      type
-    )}" value="${reorderPoint}" style="width:110px;" />`;
-
     tbody.innerHTML += `
       <tr>
-        <td>${escapeHtml(type)}</td>
+        <td>
+          <div class="row" style="gap:10px;align-items:center;justify-content:space-between;">
+            <span>${escapeHtml(type)}</span>
+            <button type="button" class="btn btn--ghost" data-inv-type-details="${escapeAttr(type)}">Details</button>
+          </div>
+        </td>
         <td class="num">${stockOnHandCount}</td>
-        <td class="num">${wasteInput}</td>
-        <td class="num">${reorderInput}</td>
-        <td class="num">${effectiveStock}</td>
-        <td>${reorderNeeded ? `<span class="pill pill--warn">REORDER</span>` : `<span class="pill pill--ok">OK</span>`}</td>
         <td class="num">${formatMoney(totalCostPrice)}</td>
         <td class="num">${formatMoney(totalSellingPrice)}</td>
       </tr>
@@ -1293,11 +2719,99 @@ function renderInventoryReports() {
   }
 
   $("#kpiInvOnHand").textContent = String(totalOnHandCount);
-  $("#kpiInvWaste").textContent = String(totalWaste);
   $("#kpiInvTotalCost").textContent = formatMoney(totalCost);
   $("#kpiInvTotalSell").textContent = formatMoney(totalSell);
 
   $("#inventoryReportsSummary").textContent = `${sortedTypes.length} type${sortedTypes.length === 1 ? "" : "s"}`;
+
+  // Attach Details handlers after re-render.
+  document.querySelectorAll("#inventoryReportsTable button[data-inv-type-details]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = btn.dataset.invTypeDetails || "";
+      viewVehiclesByInventoryTypeDetails(type);
+    });
+  });
+}
+
+function viewVehiclesByInventoryTypeDetails(type) {
+  const vType = String(type ?? "").trim();
+  if (!vType) return;
+
+  const list = (Array.isArray(db.vehicles) ? db.vehicles : [])
+    .filter((v) => v.status === "available" && inventoryTypeKey(v.vehicleType) === vType);
+
+  const w = window.open("", "_blank", "width=980,height=680");
+  if (!w) {
+    toast("Popup blocked. Allow popups to view type details.");
+    return;
+  }
+
+  const rowsHtml = list
+    .slice()
+    .sort((a, b) => String(a.stockNo ?? "").localeCompare(String(b.stockNo ?? "")))
+    .map((v) => {
+      const yearDisp = v.year != null && v.year !== "" ? String(v.year) : "—";
+      return `
+        <tr>
+          <td>${v.imageDataUrl ? `<img class="thumb" alt="img" src="${escapeAttr(v.imageDataUrl)}" />` : `<div class="thumb thumb--empty">NO IMG</div>`}</td>
+          <td><strong>${escapeHtml(v.stockNo || "—")}</strong><div class="muted" style="margin-top:4px;">VIN: ${escapeHtml(v.vin || "—")}</div></td>
+          <td>${escapeHtml(yearDisp)}</td>
+          <td>${escapeHtml(String(v.make || "").trim() || "—")}</td>
+          <td>${escapeHtml(String(v.model || "").trim() || "—")}</td>
+          <td>${escapeHtml(v.vehicleNumber || "—")}</td>
+          <td>${escapeHtml(v.gearSystem || "—")}</td>
+          <td style="text-align:right">${formatMoney(v.costPrice)}</td>
+          <td style="text-align:right">${formatMoney(v.sellPrice)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  w.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Inventory Type Details · ${escapeHtml(vType)}</title>
+        <link rel="stylesheet" href="./styles.css" />
+        <style>
+          body { font-family: Arial, sans-serif; padding: 14px; }
+          h1 { font-size: 16px; margin: 0 0 10px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border-bottom: 1px solid #e6e6e6; padding: 8px 6px; font-size: 12px; vertical-align: top; }
+          th { text-align: left; background: #fafafa; }
+          .thumb { width: 44px; height: 34px; object-fit: cover; border-radius: 6px; border: 1px solid #eee; }
+          .thumb--empty { width: 44px; height: 34px; display:flex;align-items:center;justify-content:center; background:#f3f3f3; color:#999; font-size:10px; border-radius:6px; border:1px dashed #ddd; }
+          .muted { color:#666; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(db.meta.companyName || "E-Inventory")} · Inventory Type Details</h1>
+        <div class="muted" style="margin-bottom:12px;">Type: <strong>${escapeHtml(vType)}</strong> · Vehicles: <strong>${list.length}</strong></div>
+        <div style="overflow:auto; max-height: 560px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Stock / VIN</th>
+                <th>Year</th>
+                <th>Make</th>
+                <th>Model</th>
+                <th>Vehicle No</th>
+                <th>Gear</th>
+                <th style="text-align:right">Cost</th>
+                <th style="text-align:right">Sell</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || `<tr><td colspan="9" class="muted">No vehicles found.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </body>
+    </html>
+  `);
+  w.document.close();
 }
 
 function inventoryTypeKey(vType) {
@@ -1357,7 +2871,6 @@ function computeInventoryReports(typeSettings) {
 
   const rows = [];
   let totalOnHandCount = 0;
-  let totalWaste = 0;
   let totalCost = 0;
   let totalSell = 0;
 
@@ -1365,26 +2878,16 @@ function computeInventoryReports(typeSettings) {
     const onHand = db.vehicles.filter((v) => v.status === "available" && inventoryTypeKey(v.vehicleType) === type);
     const stockOnHandCount = onHand.length;
 
-    const waste = safeNumber(settings[type]?.waste, 0);
-    const reorderPoint = safeNumber(settings[type]?.reorderPoint, 0);
-    const effectiveStock = stockOnHandCount - waste;
-    const reorderNeeded = effectiveStock <= reorderPoint;
-
     const totalCostPrice = onHand.reduce((s, v) => s + safeNumber(v.costPrice, 0), 0);
     const totalSellingPrice = onHand.reduce((s, v) => s + safeNumber(v.sellPrice, 0), 0);
 
     totalOnHandCount += stockOnHandCount;
-    totalWaste += waste;
     totalCost += totalCostPrice;
     totalSell += totalSellingPrice;
 
     rows.push({
       type,
       stockOnHand: stockOnHandCount,
-      waste,
-      reorderPoint,
-      effectiveStock,
-      reorderNeeded,
       totalCostPrice,
       totalSellingPrice,
     });
@@ -1394,7 +2897,6 @@ function computeInventoryReports(typeSettings) {
     rows,
     totals: {
       onHand: totalOnHandCount,
-      waste: totalWaste,
       cost: totalCost,
       sell: totalSell,
     },
@@ -1409,14 +2911,10 @@ function exportInventoryReportsCsv() {
   const report = computeInventoryReports(typeSettings);
 
   const rows = [
-    ["Vehicle Type", "Stock on Hand", "Waste", "Reorder Point", "Effective Stock", "Reorder Needed", "Total Cost Price", "Total Selling Price"],
+    ["Vehicle Type", "Stock on Hand", "Total Cost Price", "Total Selling Price"],
     ...report.rows.map((r) => [
       r.type,
       String(r.stockOnHand),
-      String(r.waste),
-      String(r.reorderPoint),
-      String(r.effectiveStock),
-      r.reorderNeeded ? "YES" : "NO",
       String(r.totalCostPrice),
       String(r.totalSellingPrice),
     ]),
@@ -1448,10 +2946,6 @@ function printInventoryReports() {
     <tr>
       <td>${escapeHtml(r.type)}</td>
       <td style="text-align:right">${r.stockOnHand}</td>
-      <td style="text-align:right">${r.waste}</td>
-      <td style="text-align:right">${r.reorderPoint}</td>
-      <td style="text-align:right">${r.effectiveStock}</td>
-      <td>${r.reorderNeeded ? "REORDER" : "OK"}</td>
       <td style="text-align:right">${formatMoney(r.totalCostPrice)}</td>
       <td style="text-align:right">${formatMoney(r.totalSellingPrice)}</td>
     </tr>`
@@ -1495,10 +2989,6 @@ function printInventoryReports() {
             <div class="v">${report.totals.onHand}</div>
           </div>
           <div class="kpi">
-            <div class="muted">Total waste (settings)</div>
-            <div class="v">${report.totals.waste}</div>
-          </div>
-          <div class="kpi">
             <div class="muted">Total cost price</div>
             <div class="v">${formatMoney(report.totals.cost)}</div>
           </div>
@@ -1513,16 +3003,12 @@ function printInventoryReports() {
             <tr>
               <th>Vehicle Type</th>
               <th style="text-align:right">Stock on hand</th>
-              <th style="text-align:right">Waste</th>
-              <th style="text-align:right">Reorder point</th>
-              <th style="text-align:right">Effective stock</th>
-              <th>Reorder</th>
               <th style="text-align:right">Total Cost Price</th>
               <th style="text-align:right">Total Selling Price</th>
             </tr>
           </thead>
           <tbody>
-            ${rowsHtml || `<tr><td colspan="8" class="muted">No inventory found.</td></tr>`}
+            ${rowsHtml || `<tr><td colspan="4" class="muted">No inventory found.</td></tr>`}
           </tbody>
         </table>
 
@@ -1573,6 +3059,241 @@ function clearVehicleImagePreview() {
   pendingVehicleImageDataUrl = "";
   $("#vehicleImageInput").value = "";
   setVehicleImagePreview("");
+}
+
+let pendingPurchaseImageDataUrl = "";
+
+function setPurchaseImagePreview(dataUrl) {
+  const wrap = document.querySelector("#purchaseImagePreviewWrap");
+  const img = document.querySelector("#purchaseImagePreview");
+  if (!wrap || !img) return;
+  if (!dataUrl) {
+    wrap.hidden = true;
+    img.src = "";
+    return;
+  }
+  img.src = dataUrl;
+  wrap.hidden = false;
+}
+
+function clearPurchaseImagePreview() {
+  pendingPurchaseImageDataUrl = "";
+  const input = document.querySelector("#purchaseImageInput");
+  if (input) input.value = "";
+  setPurchaseImagePreview("");
+}
+
+function updatePurchaseLeaseSectionVisibility() {
+  const sec = document.querySelector("#purchaseLeaseSection");
+  const cond = (document.querySelector("#purchaseVehicleCondition")?.value || "").trim();
+  if (!sec) return;
+  const show = cond === "Used";
+  sec.hidden = !show;
+  if (!show) {
+    const ls = document.querySelector("#purchaseLeasingStatus");
+    if (ls) ls.value = "No";
+    const lc = document.querySelector("#purchaseLeasingCompany");
+    if (lc) lc.value = "";
+    const la = document.querySelector("#purchaseLeaseAmount");
+    if (la) la.value = "";
+    const lb = document.querySelector("#purchaseLeaseBalanceAmount");
+    if (lb) lb.value = "";
+    const lp = document.querySelector("#purchaseLeasePeriod");
+    if (lp) lp.value = "";
+    const lbp = document.querySelector("#purchaseLeaseBalancePeriod");
+    if (lbp) lbp.value = "";
+  }
+}
+
+function renderPurchaseVehicleBrokerOptions() {
+  const sel = document.querySelector("#purchaseVehicleBrokerName");
+  if (!sel) return;
+  const current = sel.value || "Self";
+  const options = new Set();
+  options.add("Self");
+  for (const b of Array.isArray(db.brokers) ? db.brokers : []) {
+    const n = String(b?.name || "").trim();
+    if (n) options.add(n);
+  }
+  sel.innerHTML = "";
+  for (const opt of options) {
+    const o = document.createElement("option");
+    o.value = opt;
+    o.textContent = opt;
+    sel.appendChild(o);
+  }
+  sel.value = Array.from(options).includes(current) ? current : "Self";
+}
+
+function renderPurchasePartyOptions() {
+  const sel = document.querySelector("#purchaseParty");
+  if (!sel) return;
+  const source = document.querySelector("#purchaseSource")?.value || "supplier";
+  const current = sel.value;
+  sel.innerHTML = "";
+  const add = (val, text) => {
+    const o = document.createElement("option");
+    o.value = val;
+    o.textContent = text;
+    sel.appendChild(o);
+  };
+  add("", "— Select —");
+  if (source === "broker") {
+    for (const b of Array.isArray(db.brokers) ? db.brokers : []) {
+      const n = String(b?.name || "").trim();
+      if (n) add(n, n);
+    }
+  } else {
+    for (const s of Array.isArray(db.suppliers) ? db.suppliers : []) {
+      const n = String(s?.name || "").trim();
+      if (n) add(n, n);
+    }
+  }
+  const opts = Array.from(sel.options).map((o) => o.value);
+  if (current && opts.includes(current)) sel.value = current;
+}
+
+/** Normalize vehicle data on a purchase record (supports older saved shapes). */
+function purchaseRecordVehicle(p) {
+  if (p && p.vehicle && typeof p.vehicle === "object" && (p.vehicle.make || p.vehicle.model || p.vehicle.stockNo)) {
+    return p.vehicle;
+  }
+  if (typeof p?.vehicle === "string" && p.vehicle.trim()) {
+    return normalizeVehicle({
+      stockNo: p.stockNo || "",
+      make: p.vehicle,
+      model: "",
+      year: p.year,
+      costPrice: p.cost ?? p.costPrice ?? 0,
+      sellPrice: p.sellPrice ?? 0,
+    });
+  }
+  return normalizeVehicle({
+    stockNo: p?.stockNo || "",
+    vin: p?.vin || "",
+    make: p?.make || "",
+    model: p?.model || "",
+    year: p?.year,
+    costPrice: p?.cost ?? p?.costPrice ?? 0,
+    sellPrice: p?.sellPrice ?? 0,
+  });
+}
+
+function addPurchaseFromForm(e) {
+  e.preventDefault();
+  if (!isAdmin()) {
+    toast("Only admin can record purchases.");
+    return;
+  }
+  const partyName = (document.querySelector("#purchaseParty")?.value || "").trim();
+  if (!partyName) {
+    toast("Select a supplier or broker.");
+    return;
+  }
+
+  const payload = {
+    stockNo: document.querySelector("#purchaseStockNo")?.value,
+    vin: document.querySelector("#purchaseVin")?.value,
+    make: document.querySelector("#purchaseMake")?.value,
+    model: document.querySelector("#purchaseModel")?.value,
+    year: document.querySelector("#purchaseYear")?.value,
+    color: document.querySelector("#purchaseColor")?.value,
+    vehicleNumber: document.querySelector("#purchaseVehicleNumber")?.value,
+    vehicleType: document.querySelector("#purchaseVehicleType")?.value,
+    brokerName: document.querySelector("#purchaseVehicleBrokerName")?.value,
+    countryOfOrigin: document.querySelector("#purchaseCountryOfOrigin")?.value,
+    mileageKm: document.querySelector("#purchaseMileageKm")?.value,
+    fuelType: document.querySelector("#purchaseFuelType")?.value,
+    gearSystem: document.querySelector("#purchaseGearSystem")?.value,
+    vehicleCondition: document.querySelector("#purchaseVehicleCondition")?.value,
+    leasingStatus: document.querySelector("#purchaseLeasingStatus")?.value,
+    leasingCompany: document.querySelector("#purchaseLeasingCompany")?.value,
+    leaseAmount: document.querySelector("#purchaseLeaseAmount")?.value,
+    leaseBalanceAmount: document.querySelector("#purchaseLeaseBalanceAmount")?.value,
+    leasePeriod: document.querySelector("#purchaseLeasePeriod")?.value,
+    leaseBalancePeriod: document.querySelector("#purchaseLeaseBalancePeriod")?.value,
+    engineCc: document.querySelector("#purchaseEngineCc")?.value,
+    costPrice: document.querySelector("#purchaseCostPrice")?.value,
+    sellPrice: document.querySelector("#purchaseSellPrice")?.value,
+    notes: document.querySelector("#purchaseNotes")?.value,
+  };
+
+  const nv = normalizeVehicle(payload);
+  if (!nv.stockNo || !nv.make || !nv.model) {
+    toast("Please fill Stock No., Make, and Model.");
+    return;
+  }
+  if (nv.costPrice <= 0) {
+    toast("Enter a valid cost price.");
+    return;
+  }
+
+  nv.imageDataUrl = pendingPurchaseImageDataUrl || "";
+  nv.docs = [];
+  nv.status = "available";
+  nv.soldAt = null;
+  nv.saleId = null;
+
+  const rec = {
+    id: uid("pur"),
+    createdAt: nowIso(),
+    purchaseDate: document.querySelector("#purchaseDate")?.value || todayISODate(),
+    source: document.querySelector("#purchaseSource")?.value || "supplier",
+    partyName,
+    vehicle: nv,
+  };
+
+  db.purchases = Array.isArray(db.purchases) ? db.purchases : [];
+  db.purchases.unshift(rec);
+  persist();
+  resetPurchaseForm();
+  closePurchaseFormDialog();
+  renderPurchases();
+  toast("Purchase recorded.");
+}
+
+function resetPurchaseForm() {
+  document.querySelector("#purchaseForm")?.reset();
+  clearPurchaseImagePreview();
+  const d = document.querySelector("#purchaseDate");
+  if (d) d.value = todayISODate();
+  renderPurchasePartyOptions();
+  renderPurchaseVehicleBrokerOptions();
+  updatePurchaseLeaseSectionVisibility();
+}
+
+function renderPurchases() {
+  const tbody = document.querySelector("#purchaseTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const q = (document.querySelector("#purchaseSearch")?.value || "").trim().toLowerCase();
+  const list = (Array.isArray(db.purchases) ? db.purchases : [])
+    .filter((p) => {
+      if (!q) return true;
+      const v = purchaseRecordVehicle(p);
+      const hay = `${p.partyName ?? ""} ${p.source ?? ""} ${v.stockNo} ${v.vin} ${v.make} ${v.model} ${vehicleLabel(v)} ${v.gearSystem ?? ""} ${p.purchaseDate ?? ""}`
+        .toLowerCase();
+      return hay.includes(q);
+    })
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+  for (const p of list) {
+    const v = purchaseRecordVehicle(p);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(p.purchaseDate || "—")}</td>
+      <td><span class="pill">${escapeHtml(p.source || "—")}</span></td>
+      <td>${escapeHtml(p.partyName || "—")}</td>
+      <td><span class="pill">${escapeHtml(v.stockNo || "—")}</span></td>
+      <td><strong>${escapeHtml(vehicleLabel(v) || "—")}</strong></td>
+      <td class="num">${formatMoney(v.costPrice)}</td>
+      <td class="num">${formatMoney(v.sellPrice)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  const sum = document.querySelector("#purchaseSummary");
+  if (sum) sum.textContent = `${list.length} purchase${list.length === 1 ? "" : "s"}`;
 }
 
 function updateLeaseSectionVisibility() {
@@ -1640,6 +3361,7 @@ async function upsertVehicleFromForm(e) {
     countryOfOrigin: $("#countryOfOrigin").value,
     mileageKm: $("#mileageKm").value,
     fuelType: $("#fuelType").value,
+    gearSystem: $("#gearSystem").value,
     vehicleCondition: $("#vehicleCondition").value,
     leasingStatus: $("#leasingStatus").value,
     leasingCompany: $("#leasingCompany").value,
@@ -1686,6 +3408,7 @@ async function upsertVehicleFromForm(e) {
   }
   persist();
   resetVehicleForm();
+  closeVehicleFormDialog();
   renderAll();
 }
 
@@ -1709,6 +3432,7 @@ function deleteVehicleFromForm() {
   db.vehicles = db.vehicles.filter((x) => x.id !== id);
   persist();
   resetVehicleForm();
+  closeVehicleFormDialog();
   renderAll();
   toast("Vehicle deleted.");
 }
@@ -1789,17 +3513,26 @@ function renderInvoicePreview() {
   $("#invNo").textContent = invNo;
   $("#invDate").textContent = dtStr;
 
-  const customer = ($("#customerName").value || "").trim() || "Walk-in";
-  const phone = ($("#customerPhone").value || "").trim() || "—";
+  const customer = ($("#invoiceCustomerName").value || "").trim() || "Walk-in";
+  const phone = ($("#invoiceCustomerPhone").value || "").trim() || "—";
   const pay = $("#paymentMethod").value || "Cash";
-  const bearing = ($("#bearingAmount").value || "").trim() ? safeNumber($("#bearingAmount").value, total) : total;
-  const sumLkr = ($("#sumLkrAmount").value || "").trim() ? safeNumber($("#sumLkrAmount").value, total) : total;
+  const bearingIdNo = ($("#bearingAmount").value || "").trim() || "—";
+  const paidRaw = ($("#sumLkrAmount").value || "").trim();
+  const paidAmount = paidRaw ? Math.max(0, safeNumber(paidRaw, total)) : total;
+  const sumLkr = subtotal;
 
   $("#invCustomer").textContent = customer;
   $("#invPhone").textContent = phone;
   $("#invPayment").textContent = pay;
   const invPaymentsSummaryEl = document.querySelector("#invPaymentsSummary");
-  if (invPaymentsSummaryEl) invPaymentsSummaryEl.textContent = `${pay} (LKR ${formatMoney(sumLkr).replace(/\s+/g, " ")})`;
+  if (invPaymentsSummaryEl) {
+    const remaining = Math.max(0, total - paidAmount);
+    if (remaining <= 0) {
+      invPaymentsSummaryEl.textContent = "Full Payments";
+    } else {
+      invPaymentsSummaryEl.textContent = `${pay} Paid: ${formatMoney(paidAmount)} | Balance: ${formatMoney(remaining)}`;
+    }
+  }
 
   const tb = $("#invoiceItemsTable tbody");
   tb.innerHTML = "";
@@ -1813,6 +3546,7 @@ function renderInvoicePreview() {
         ${escapeHtml(vehicleLabel(v))}
         ${v.vin ? `<div class="muted" style="margin-top:4px;">VIN: ${escapeHtml(v.vin)}</div>` : ""}
         ${v.color ? `<div class="muted" style="margin-top:${v.vin ? "2px" : "4px"};">Color: ${escapeHtml(v.color)}</div>` : ""}
+        ${v.gearSystem ? `<div class="muted" style="margin-top:2px;">Gear: ${escapeHtml(v.gearSystem)}</div>` : ""}
       </td>
       <td class="num">${formatMoney(v.sellPrice)}</td>
     `;
@@ -1827,7 +3561,7 @@ function renderInvoicePreview() {
   if (invSubtotalEl) invSubtotalEl.textContent = formatMoney(subtotal);
   if (invDiscountEl) invDiscountEl.textContent = formatMoney(discount);
   if (invTotalEl) invTotalEl.textContent = formatMoney(total);
-  if (invBearingEl) invBearingEl.textContent = formatMoney(bearing);
+  if (invBearingEl) invBearingEl.textContent = bearingIdNo;
   if (invSumLkrEl) invSumLkrEl.textContent = formatMoney(sumLkr);
   const amountWords = `${numberToWords(sumLkr)} LKR Only`;
   const docsCount = items.reduce((s, v) => s + (Array.isArray(v.docs) ? v.docs.length : 0), 0);
@@ -1879,13 +3613,14 @@ function completeSale() {
     invoiceNo,
     createdAt: nowIso(),
     customer: {
-      name: ($("#customerName").value || "").trim() || "Walk-in",
-      phone: ($("#customerPhone").value || "").trim(),
+      name: ($("#invoiceCustomerName").value || "").trim() || "Walk-in",
+      phone: ($("#invoiceCustomerPhone").value || "").trim(),
     },
     paymentMethod: $("#paymentMethod").value || "Cash",
     remarks: ($("#invoiceRemarks").value || "").trim(),
-    bearingAmount: ($("#bearingAmount").value || "").trim() ? safeNumber($("#bearingAmount").value, total) : total,
-    sumLkrAmount: ($("#sumLkrAmount").value || "").trim() ? safeNumber($("#sumLkrAmount").value, total) : total,
+    customerIdNumber: ($("#bearingAmount").value || "").trim(),
+    paidAmount: ($("#sumLkrAmount").value || "").trim() ? Math.max(0, safeNumber($("#sumLkrAmount").value, total)) : total,
+    sumLkrAmount: subtotal,
     items: items.map((v) => ({
       vehicleId: v.id,
       stockNo: v.stockNo,
@@ -1895,6 +3630,7 @@ function completeSale() {
       model: v.model,
       year: v.year,
       color: v.color,
+      gearSystem: v.gearSystem ?? "",
       sellPrice: safeNumber(v.sellPrice, 0),
     })),
     subtotal,
@@ -1928,6 +3664,7 @@ function completeSale() {
   db.cart.items = [];
   db.cart.discount = 0;
   persist();
+  sendImmediateInvoiceMessage(sale);
   renderAll();
   toast("Sale completed.");
   setActiveTab("reports");
@@ -2014,6 +3751,7 @@ function addLedgerEntryFromForm(e) {
   $("#ledgerDate").value = todayISODate();
   renderAll();
   toast("Ledger entry added.");
+  closeLedgerEntryDialog();
 }
 
 function dateInRange(iso, from, to) {
@@ -2047,11 +3785,17 @@ function renderReports() {
   for (const s of list) {
     const tr = document.createElement("tr");
     const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleString() : "";
+    const paidAmount = Math.max(0, safeNumber(s.paidAmount, s.total ?? 0));
+    const balanceAmount = Math.max(0, safeNumber(s.total, 0) - paidAmount);
+    const paymentCellHtml =
+      balanceAmount > 0
+        ? `${escapeHtml(s.paymentMethod || "")}<div style="margin-top:6px;"><span class="pill pill--warn">PARTIAL PAYMENT</span></div><div class="muted" style="margin-top:6px;">Balance: ${formatMoney(balanceAmount)}</div>`
+        : `${escapeHtml(s.paymentMethod || "")}<div class="muted" style="margin-top:6px;">Full Payments</div>`;
     tr.innerHTML = `
       <td>${escapeHtml(dateStr)}</td>
       <td><span class="pill">${escapeHtml(s.invoiceNo)}</span></td>
       <td>${escapeHtml(s.customer?.name || "Walk-in")}</td>
-      <td>${escapeHtml(s.paymentMethod || "")}</td>
+      <td>${paymentCellHtml}</td>
       <td>${escapeHtml(String(s.items?.length || 0))}</td>
       <td class="num"><strong>${formatMoney(s.total)}</strong></td>
       <td class="actions"></td>
@@ -2084,12 +3828,21 @@ function viewSale(saleId) {
   // ensure company info/logo is shown on invoice preview
   renderInvoiceBranding();
   $("#invoiceNo").value = s.invoiceNo;
-  $("#customerName").value = s.customer?.name || "";
-  $("#customerPhone").value = s.customer?.phone || "";
+  $("#invoiceCustomerName").value = s.customer?.name || "";
+  $("#invoiceCustomerPhone").value = s.customer?.phone || "";
+  const pick = document.querySelector("#invoiceCustomerPick");
+  if (pick) {
+    const match = (db.customers || []).find(
+      (c) =>
+        String(c.name || "").trim().toLowerCase() === String(s.customer?.name || "").trim().toLowerCase() &&
+        String(c.phone || "").trim() === String(s.customer?.phone || "").trim()
+    );
+    pick.value = match?.id || "";
+  }
   $("#paymentMethod").value = s.paymentMethod || "Cash";
   $("#invoiceRemarks").value = s.remarks || "";
-  $("#bearingAmount").value = s.bearingAmount ?? s.total ?? "";
-  $("#sumLkrAmount").value = s.sumLkrAmount ?? s.total ?? "";
+  $("#bearingAmount").value = s.customerIdNumber ?? (s.bearingAmount != null ? String(s.bearingAmount) : "");
+  $("#sumLkrAmount").value = s.paidAmount ?? s.total ?? "";
 
   // show invoice preview using sale snapshot (without changing cart)
   $("#invMetaLine").textContent = new Date(s.createdAt).toLocaleString();
@@ -2099,8 +3852,15 @@ function viewSale(saleId) {
   $("#invPhone").textContent = s.customer?.phone || "—";
   $("#invPayment").textContent = s.paymentMethod || "Cash";
   const invPaymentsSummaryEl = document.querySelector("#invPaymentsSummary");
-  if (invPaymentsSummaryEl)
-    invPaymentsSummaryEl.textContent = `${s.paymentMethod || "Cash"} (LKR ${formatMoney(s.sumLkrAmount ?? s.total ?? 0).replace(/\s+/g, " ")})`;
+  if (invPaymentsSummaryEl) {
+    const paidAmount = Math.max(0, safeNumber(s.paidAmount, s.total ?? 0));
+    const remaining = Math.max(0, safeNumber(s.total, 0) - paidAmount);
+    if (remaining <= 0) {
+      invPaymentsSummaryEl.textContent = "Full Payments";
+    } else {
+      invPaymentsSummaryEl.textContent = `${s.paymentMethod || "Cash"} Paid: ${formatMoney(paidAmount)} | Balance: ${formatMoney(remaining)}`;
+    }
+  }
 
   const tb = $("#invoiceItemsTable tbody");
   tb.innerHTML = "";
@@ -2111,12 +3871,14 @@ function viewSale(saleId) {
   for (const it of s.items || []) {
     const tr = document.createElement("tr");
     const label = `${it.year ? `${it.year} ` : ""}${it.make} ${it.model}`.trim();
+    const gear = String(it.gearSystem || getVehicleById(it.vehicleId)?.gearSystem || "").trim();
     tr.innerHTML = `
       <td>${escapeHtml(it.stockNo)}</td>
       <td>
         ${escapeHtml(label)}
         ${it.vin ? `<div class="muted" style="margin-top:4px;">VIN: ${escapeHtml(it.vin)}</div>` : ""}
         ${it.color ? `<div class="muted" style="margin-top:${it.vin ? "2px" : "4px"};">Color: ${escapeHtml(it.color)}</div>` : ""}
+        ${gear ? `<div class="muted" style="margin-top:2px;">Gear: ${escapeHtml(gear)}</div>` : ""}
       </td>
       <td class="num">${formatMoney(it.sellPrice)}</td>
     `;
@@ -2130,11 +3892,11 @@ function viewSale(saleId) {
   if (invSubtotalEl) invSubtotalEl.textContent = formatMoney(s.subtotal);
   if (invDiscountEl) invDiscountEl.textContent = formatMoney(s.discount);
   if (invTotalEl) invTotalEl.textContent = formatMoney(s.total);
-  if (invBearingEl) invBearingEl.textContent = formatMoney(s.bearingAmount ?? s.total ?? 0);
-  if (invSumLkrEl) invSumLkrEl.textContent = formatMoney(s.sumLkrAmount ?? s.total ?? 0);
+  if (invBearingEl) invBearingEl.textContent = s.customerIdNumber || (s.bearingAmount != null ? String(s.bearingAmount) : "—");
+  if (invSumLkrEl) invSumLkrEl.textContent = formatMoney(s.subtotal ?? s.sumLkrAmount ?? s.total ?? 0);
   $("#invSaleOf").textContent = saleOf;
   $("#invRegNo").textContent = regNo;
-  $("#invAmountWords").textContent = `${numberToWords(s.sumLkrAmount ?? s.total ?? 0)} LKR Only`;
+  $("#invAmountWords").textContent = `${numberToWords(s.subtotal ?? s.sumLkrAmount ?? s.total ?? 0)} LKR Only`;
   $("#invDocOriginalCr").textContent = "As per sale";
   $("#invDocNoObj").textContent = "As per sale";
   $("#invDocDeletion").textContent = "As per sale";
@@ -2481,24 +4243,34 @@ function initEvents() {
   $("#vehicleForm").addEventListener("submit", upsertVehicleFromForm);
   $("#btnClearVehicleForm").addEventListener("click", resetVehicleForm);
   $("#btnDeleteVehicle").addEventListener("click", deleteVehicleFromForm);
+  document.querySelector("#btnAddNewVehicle")?.addEventListener("click", openVehicleFormDialogForNew);
+  document.querySelector("#btnCloseVehicleFormDialog")?.addEventListener("click", () => {
+    document.querySelector("#vehicleFormDialog")?.close();
+  });
   $("#inventorySearch").addEventListener("input", renderInventory);
   $("#inventoryFilterStatus").addEventListener("change", renderInventory);
+  document.querySelector("#homeVehicleSearch")?.addEventListener("input", () => {
+    // Requirement: do not show search results in the dashboard table.
+    const tbody = document.querySelector("#homeVehicleSearchTable tbody");
+    const summary = document.querySelector("#homeVehicleSearchSummary");
+    if (tbody) tbody.innerHTML = "";
+    if (summary) summary.textContent = "Click Search to open results window.";
+  });
+  document.querySelector("#homeVehicleSearch")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      openHomeVehicleSearchResultsWindow();
+    }
+  });
+  document.querySelector("#btnHomeVehicleSearch")?.addEventListener("click", openHomeVehicleSearchResultsWindow);
+  document.querySelector("#btnGoInventory")?.addEventListener("click", () => openHomeQuickTab("inventory"));
+  document.querySelector("#btnHomeBilling")?.addEventListener("click", () => openHomeQuickTab("billing"));
+  document.querySelector("#btnHomePurchase")?.addEventListener("click", () => openHomeQuickTab("purchase"));
+  document.querySelector("#btnHomeSupplier")?.addEventListener("click", () => openHomeQuickTab("suppliers"));
+  document.querySelector("#btnHomeCustomer")?.addEventListener("click", () => openHomeQuickTab("customer"));
+  document.querySelector("#soldVehicleSearch")?.addEventListener("input", renderSoldVehicleReports);
   $("#vehicleCondition").addEventListener("change", updateLeaseSectionVisibility);
-  const btnAvail = document.querySelector("#btnShowAvailable");
-  const btnSold = document.querySelector("#btnShowSold");
   const btnAll = document.querySelector("#btnShowAllInv");
-  if (btnAvail) {
-    btnAvail.addEventListener("click", () => {
-      $("#inventoryFilterStatus").value = "available";
-      renderInventory();
-    });
-  }
-  if (btnSold) {
-    btnSold.addEventListener("click", () => {
-      $("#inventoryFilterStatus").value = "sold";
-      renderInventory();
-    });
-  }
   if (btnAll) {
     btnAll.addEventListener("click", () => {
       $("#inventoryFilterStatus").value = "all";
@@ -2548,10 +4320,76 @@ function initEvents() {
     viewSale(saleId);
     window.print();
   });
-  ["#customerName", "#customerPhone", "#paymentMethod", "#invoiceNo", "#invoiceRemarks", "#bearingAmount", "#sumLkrAmount"].forEach((sel) => {
+  ["#invoiceCustomerName", "#invoiceCustomerPhone", "#paymentMethod", "#invoiceNo", "#invoiceRemarks", "#bearingAmount", "#sumLkrAmount"].forEach((sel) => {
     $(sel).addEventListener("input", renderInvoicePreview);
     $(sel).addEventListener("change", renderInvoicePreview);
   });
+  document.querySelector("#invoiceSentAuto")?.addEventListener("change", () => {
+    db.meta.invoiceSentAuto = !!document.querySelector("#invoiceSentAuto")?.checked;
+    persist();
+  });
+
+  const invPick = document.querySelector("#invoiceCustomerPick");
+  if (invPick) {
+    invPick.addEventListener("change", () => {
+      const id = invPick.value?.trim() || "";
+      if (!id) {
+        renderInvoicePreview();
+        return;
+      }
+      const c = (db.customers || []).find((x) => x.id === id);
+      if (!c) return;
+      const nameEl = document.querySelector("#invoiceCustomerName");
+      const phoneEl = document.querySelector("#invoiceCustomerPhone");
+      if (nameEl) nameEl.value = c.name || "";
+      if (phoneEl) phoneEl.value = c.phone || "";
+      renderInvoicePreview();
+    });
+  }
+  document.querySelector("#invoiceCustomerName")?.addEventListener("input", () => {
+    const p = document.querySelector("#invoiceCustomerPick");
+    if (p) p.value = "";
+  });
+  document.querySelector("#invoiceCustomerPhone")?.addEventListener("input", () => {
+    const p = document.querySelector("#invoiceCustomerPick");
+    if (p) p.value = "";
+  });
+
+  const quoteCustomerPick = document.querySelector("#quotationCustomerPick");
+  if (quoteCustomerPick) {
+    quoteCustomerPick.addEventListener("change", () => {
+      const id = quoteCustomerPick.value?.trim() || "";
+      if (!id) return renderQuotationPreview();
+      const c = (db.customers || []).find((x) => x.id === id);
+      if (!c) return;
+      const nameEl = document.querySelector("#quotationCustomerName");
+      const phoneEl = document.querySelector("#quotationCustomerPhone");
+      if (nameEl) nameEl.value = c.name || "";
+      if (phoneEl) phoneEl.value = c.phone || "";
+      renderQuotationPreview();
+    });
+  }
+  document.querySelector("#quotationCustomerName")?.addEventListener("input", () => {
+    const p = document.querySelector("#quotationCustomerPick");
+    if (p) p.value = "";
+    renderQuotationPreview();
+  });
+  document.querySelector("#quotationCustomerPhone")?.addEventListener("input", renderQuotationPreview);
+  document.querySelector("#quotationDate")?.addEventListener("change", renderQuotationPreview);
+  document.querySelector("#quotationValidUntil")?.addEventListener("change", renderQuotationPreview);
+  document.querySelector("#quotationRemarks")?.addEventListener("input", renderQuotationPreview);
+  document.querySelector("#quotationPrice")?.addEventListener("input", renderQuotationPreview);
+  document.querySelector("#quotationVehiclePick")?.addEventListener("change", () => {
+    const v = getVehicleById(document.querySelector("#quotationVehiclePick")?.value || "");
+    const priceEl = document.querySelector("#quotationPrice");
+    if (v && priceEl && !String(priceEl.value || "").trim()) {
+      priceEl.value = String(safeNumber(v.sellPrice, 0));
+    }
+    renderQuotationPreview();
+  });
+  document.querySelector("#btnSaveQuotation")?.addEventListener("click", saveQuotation);
+  document.querySelector("#btnSendQuotationWhatsapp")?.addEventListener("click", sendQuotationWhatsapp);
+  document.querySelector("#btnPrintQuotation")?.addEventListener("click", printQuotation);
 
   // invoice logo + company name
   $("#invoiceLogoInput").addEventListener("change", async () => {
@@ -2609,10 +4447,13 @@ function initEvents() {
     renderInvoiceBranding();
   });
 
+  ensureLedgerEntryDialogMount();
   $("#ledgerForm").addEventListener("submit", addLedgerEntryFromForm);
   $("#ledgerDate").value = todayISODate();
   $("#ledgerSearch").addEventListener("input", renderLedger);
   $("#ledgerFilterType").addEventListener("change", renderLedger);
+  document.querySelector("#btnAddNewLedgerEntry")?.addEventListener("click", openLedgerEntryDialogForNew);
+  document.querySelector("#btnCloseLedgerEntryDialog")?.addEventListener("click", closeLedgerEntryDialog);
 
   $("#btnApplyReportFilter").addEventListener("click", renderReports);
   $("#btnClearReportFilter").addEventListener("click", () => {
@@ -2644,6 +4485,10 @@ function initEvents() {
     renderAll();
     toast("All data reset.");
     resetVehicleForm();
+    closeVehicleFormDialog();
+    closePurchaseFormDialog();
+    closeLedgerEntryDialog();
+    closeCustomerFormDialog();
   });
 
   const btnSaveInvRpt = document.querySelector("#btnSaveInventoryReportSettings");
@@ -2682,10 +4527,86 @@ function initEvents() {
   if (document.querySelector("#brokerForm")) {
     $("#brokerForm").addEventListener("submit", upsertBrokerFromForm);
     $("#brokerSearch").addEventListener("input", renderBrokers);
+    document.querySelector("#btnAddNewBroker")?.addEventListener("click", openBrokerFormDialogForNew);
+    document.querySelector("#btnCloseBrokerFormDialog")?.addEventListener("click", closeBrokerFormDialog);
     $("#btnDeleteBroker").addEventListener("click", () => {
       const id = document.querySelector("#brokerId").value.trim();
       if (id) deleteBroker(id);
     });
+  }
+
+  // suppliers (admin)
+  if (document.querySelector("#supplierForm")) {
+    $("#supplierForm").addEventListener("submit", upsertSupplierFromForm);
+    document.querySelector("#supplierSearch")?.addEventListener("input", renderSuppliers);
+    document.querySelector("#btnAddNewSupplier")?.addEventListener("click", openSupplierFormDialogForNew);
+    document.querySelector("#btnCloseSupplierFormDialog")?.addEventListener("click", closeSupplierFormDialog);
+    document.querySelector("#btnDeleteSupplier")?.addEventListener("click", () => {
+      const id = document.querySelector("#supplierId")?.value.trim();
+      if (id) deleteSupplier(id);
+    });
+  }
+
+  // customers (garage menu section)
+  if (document.querySelector("#customerForm")) {
+    $("#customerForm").addEventListener("submit", upsertCustomerFromForm);
+    document.querySelector("#customerSearch")?.addEventListener("input", renderCustomers);
+    document.querySelector("#btnClearCustomerForm")?.addEventListener("click", clearCustomerForm);
+    document.querySelector("#btnAddNewCustomer")?.addEventListener("click", openCustomerFormDialogForNew);
+    document.querySelector("#btnCloseCustomerFormDialog")?.addEventListener("click", closeCustomerFormDialog);
+    document.querySelector("#btnDeleteCustomer")?.addEventListener("click", () => {
+      const id = document.querySelector("#customerId")?.value.trim();
+      if (id) deleteCustomer(id);
+    });
+  }
+
+  // garage jobs
+  if (document.querySelector("#garageJobForm")) {
+    $("#garageJobForm").addEventListener("submit", upsertGarageJobFromForm);
+    document.querySelector("#garageJobSearch")?.addEventListener("input", renderGarageJobs);
+    document.querySelector("#btnClearGarageJobForm")?.addEventListener("click", clearGarageJobForm);
+    document.querySelector("#btnAddNewGarageJob")?.addEventListener("click", openGarageJobFormDialogForNew);
+    document.querySelector("#btnCloseGarageJobFormDialog")?.addEventListener("click", closeGarageJobFormDialog);
+    document.querySelector("#btnDeleteGarageJob")?.addEventListener("click", () => {
+      const id = document.querySelector("#garageJobId")?.value.trim();
+      if (id) deleteGarageJob(id);
+      else toast("Select a job to delete (Edit first).");
+    });
+  }
+
+  // purchase (admin)
+  if (document.querySelector("#purchaseForm")) {
+    $("#purchaseForm").addEventListener("submit", addPurchaseFromForm);
+    document.querySelector("#btnAddNewPurchase")?.addEventListener("click", openPurchaseFormDialogForNew);
+    document.querySelector("#btnClosePurchaseFormDialog")?.addEventListener("click", () => {
+      document.querySelector("#purchaseFormDialog")?.close();
+    });
+    document.querySelector("#btnResetPurchaseForm")?.addEventListener("click", resetPurchaseForm);
+    $("#purchaseSource").addEventListener("change", () => {
+      renderPurchasePartyOptions();
+    });
+    const pCond = document.querySelector("#purchaseVehicleCondition");
+    if (pCond) pCond.addEventListener("change", updatePurchaseLeaseSectionVisibility);
+    const pImg = document.querySelector("#purchaseImageInput");
+    if (pImg) {
+      pImg.addEventListener("change", async () => {
+        const f = pImg.files?.[0];
+        if (!f) return;
+        try {
+          pendingPurchaseImageDataUrl = await readImageAsDataUrl(f);
+          setPurchaseImagePreview(pendingPurchaseImageDataUrl);
+          toast("Image selected.");
+        } catch {
+          toast("Invalid image file.");
+        }
+      });
+    }
+    document.querySelector("#btnClearPurchaseImage")?.addEventListener("click", () => {
+      clearPurchaseImagePreview();
+      toast("Image removed.");
+    });
+    const pSearch = document.querySelector("#purchaseSearch");
+    if (pSearch) pSearch.addEventListener("input", renderPurchases);
   }
 }
 
@@ -2764,6 +4685,38 @@ function renderInvoiceBranding() {
   }
 
   setCopyrightTexts();
+}
+
+function renderInvoiceSentSettings() {
+  const chk = document.querySelector("#invoiceSentAuto");
+  const tpl = document.querySelector("#invoiceSentTemplate");
+  if (chk) chk.checked = !!db.meta.invoiceSentAuto;
+  if (tpl) tpl.value = db.meta.invoiceSentTemplate || INVOICE_SENT_TEMPLATE;
+}
+
+function buildInvoiceSentMessage(sale) {
+  const template = String(db.meta.invoiceSentTemplate || INVOICE_SENT_TEMPLATE);
+  const customerName = String(sale?.customer?.name || "Customer");
+  const invoiceNo = String(sale?.invoiceNo || "—");
+  const amount = formatMoney(sale?.total ?? 0);
+  const companyName = String(db.meta.companyName || "E-Inventory");
+  return template
+    .replaceAll("{{Customer Name}}", customerName)
+    .replaceAll("{{Invoice Number}}", invoiceNo)
+    .replaceAll("{{Amount}}", amount)
+    .replaceAll("{{Company Name}}", companyName);
+}
+
+function sendImmediateInvoiceMessage(sale) {
+  if (!db.meta.invoiceSentAuto) return;
+  const phoneRaw = String(sale?.customer?.phone || "").trim();
+  const phone = phoneRaw.replace(/[^\d+]/g, "");
+  if (!phone) {
+    toast("Invoice SMS skipped: customer phone missing.");
+    return;
+  }
+  const text = buildInvoiceSentMessage(sale);
+  window.open(`sms:${phone}?body=${encodeURIComponent(text)}`, "_blank");
 }
 
 function exportSalesPdf() {
@@ -2868,13 +4821,22 @@ function exportSalesPdf() {
 
 function renderAll() {
   renderVehicleBrokerOptions();
+  renderPurchaseVehicleBrokerOptions();
   renderInventory();
+  renderSoldVehicleReports();
   renderInventoryReports();
   renderCart();
+  renderQuotation();
   renderLedger();
   renderReports();
   renderUsers();
   renderBrokers();
+  renderSuppliers();
+  renderPurchases();
+  renderCustomers();
+  renderInvoiceCustomerPick();
+  renderInvoiceSentSettings();
+  renderGarageJobs();
 }
 
 async function bootstrap() {
@@ -2883,17 +4845,36 @@ async function bootstrap() {
     auth = ensureAuthSeed();
   }
 
+  db.customers = Array.isArray(db.customers) ? db.customers : [];
+  db.garageJobs = Array.isArray(db.garageJobs) ? db.garageJobs : [];
+  db.quotations = Array.isArray(db.quotations) ? db.quotations : [];
+  if (typeof db.meta.invoiceSentAuto !== "boolean") db.meta.invoiceSentAuto = false;
+  if (!String(db.meta.invoiceSentTemplate || "").trim()) db.meta.invoiceSentTemplate = INVOICE_SENT_TEMPLATE;
+  if (String(db.meta.invoiceSentTemplate || "").trim() === INVOICE_SENT_TEMPLATE_OLD) {
+    db.meta.invoiceSentTemplate = INVOICE_SENT_TEMPLATE;
+  }
+
   initNav();
   initEvents();
   resetVehicleForm();
   updateLeaseSectionVisibility();
+  const qDate = document.querySelector("#quotationDate");
+  if (qDate && !qDate.value) qDate.value = todayISODate();
+  const qValid = document.querySelector("#quotationValidUntil");
+  if (qValid && !qValid.value) {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    qValid.value = d.toISOString().slice(0, 10);
+  }
+  const pDate = document.querySelector("#purchaseDate");
+  if (pDate && !pDate.value) pDate.value = todayISODate();
+  renderPurchasePartyOptions();
+  renderPurchaseVehicleBrokerOptions();
+  updatePurchaseLeaseSectionVisibility();
   renderAll();
   renderInvoicePreview();
   renderInvoiceBranding();
   setUserUi();
-
-  // Home page — Open inventory (button optional if removed from HTML)
-  document.querySelector("#btnGoInventory")?.addEventListener("click", () => setActiveTab("inventory"));
 
   // Always land on Home (so login isn't on a blank/empty screen)
   setActiveTab("home");

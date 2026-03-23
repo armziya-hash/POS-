@@ -41,10 +41,19 @@
           <summary class="navItem navItem--menu">Main Menu</summary>
           <div class="menu__panel" role="menu" aria-label="Main menu items">
             <button class="menu__item" type="button" data-nav="inventory">Inventory</button>
-            <button class="menu__item" type="button" data-nav="inventoryReports">Inventory Reports</button>
             <button class="menu__item" type="button" data-nav="billing">Billing</button>
+            <button class="menu__item" type="button" data-nav="quotation">Quotation</button>
             <button class="menu__item" type="button" data-nav="ledger">Ledger</button>
-            <button class="menu__item" type="button" data-nav="reports">Sales Reports</button>
+            <details class="reportsSubMenu" id="reportsSubMenu">
+              <summary class="menu__item" role="button" aria-label="Reports menu">Reports</summary>
+              <div class="menu__panel menu__panel--sub" role="menu" aria-label="Reports submenu">
+                <button class="menu__item" type="button" data-nav="inventoryReports">Inventory Reports</button>
+                <button class="menu__item" type="button" data-nav="reports">Sales Reports</button>
+                <button class="menu__item" type="button" data-nav="soldVehicleReports">Sold Vehicle Reports</button>
+              </div>
+            </details>
+            <button class="menu__item" type="button" data-nav="garage">Garage</button>
+            <button class="menu__item" type="button" data-nav="customer">Customer</button>
             <div class="menu__sep"></div>
             <button class="menu__item" type="button" data-nav="brokers">Brokers</button>
             <button class="menu__item" type="button" data-nav="purchase">Purchase</button>
@@ -73,8 +82,27 @@
               <div class="homeHero__subtitle muted">
                 Manage stock, process sales, track the ledger, and run reports — with role-based access for your team.
               </div>
-              <div class="homeHero__actions">
-                <button class="btn btn--primary" id="btnGoInventory" type="button">Open inventory</button>
+              <div class="homeQuickNav" aria-label="Dashboard quick navigation">
+                <button class="btn btn--primary homeQuickNav__btn" id="btnGoInventory" type="button">Inventory</button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeBilling" type="button">Billing</button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomePurchase" type="button">Purchase</button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeSupplier" type="button">Supplier</button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeCustomer" type="button">Customer</button>
+              </div>
+              <div class="card homeHero__quickSearchCard">
+                <div class="card__header">
+                  <h3>Quick Vehicle Search</h3>
+                </div>
+                <div class="row homeHero__quickSearchRow">
+                  <input
+                    id="homeVehicleSearch"
+                    class="input"
+                    type="search"
+                    placeholder="Search by Stock No or Vehicle Number"
+                  />
+                  <button class="btn btn--primary" id="btnHomeVehicleSearch" type="button">Search</button>
+                </div>
+                <div class="card__footer muted homeHero__quickSearchFooter"></div>
               </div>
               <div class="homeHero__hint muted">
                 Sign in to continue. Permissions are enforced by role (RBAC).
@@ -89,170 +117,18 @@
         <div class="panel__header">
           <div>
             <h2>Inventory</h2>
-            <p class="muted">Add vehicles, attach documents, edit/delete, and add to cart.</p>
+            <p class="muted">Use <strong>+ Add new vehicle</strong> to open the form in a window. Attach documents, edit/delete, and add to cart from the list.</p>
           </div>
           <div class="panel__actions">
             <button class="btn" id="btnExportData" title="Export data JSON">Export</button>
-            <label class="btn btn--ghost" for="importFile" title="Import data JSON">Import</label>
+            <label class="btn" for="importFile" title="Import data JSON">Import</label>
             <input id="importFile" type="file" accept="application/json" hidden />
+            <button class="btn btn--primary" type="button" id="btnAddNewVehicle" title="Open add-vehicle form">+ Add new vehicle</button>
             <button class="btn btn--danger" id="btnResetAll" title="Clears all saved data">Reset All</button>
           </div>
         </div>
 
-        <div class="grid grid--2">
-          <form id="vehicleForm" class="card">
-            <div class="card__header">
-              <h3 id="vehicleFormTitle">Add Vehicle</h3>
-              <span class="badge" id="vehicleFormModeBadge">New</span>
-            </div>
-
-            <input type="hidden" id="vehicleId" />
-
-            <div class="formGrid">
-              <label class="field">
-                <span>Stock No.</span>
-                <input id="stockNo" type="text" placeholder="e.g. STK-001" autocomplete="off" required />
-              </label>
-              <label class="field">
-                <span>VIN / Chassis</span>
-                <input id="vin" type="text" placeholder="optional" autocomplete="off" />
-              </label>
-              <label class="field">
-                <span>Make</span>
-                <input id="make" type="text" placeholder="e.g. Toyota" autocomplete="off" required />
-              </label>
-              <label class="field">
-                <span>Model</span>
-                <input id="model" type="text" placeholder="e.g. Corolla" autocomplete="off" required />
-              </label>
-              <label class="field">
-                <span>Year</span>
-                <input id="year" type="number" inputmode="numeric" min="1900" max="2100" placeholder="e.g. 2020" />
-              </label>
-              <label class="field">
-                <span>Color</span>
-                <input id="color" type="text" placeholder="optional" autocomplete="off" />
-              </label>
-              <label class="field">
-                <span>Vehicle Number</span>
-                <input id="vehicleNumber" type="text" placeholder="e.g. ABC-1234" autocomplete="off" />
-              </label>
-              <label class="field">
-                <span>Vehicle Type</span>
-                <select id="vehicleType">
-                  <option value="">Select</option>
-                  <option value="Car">Car</option>
-                  <option value="Van">Van</option>
-                  <option value="Bus">Bus</option>
-                  <option value="Truck">Truck</option>
-                  <option value="Pickup">Pickup</option>
-                  <option value="Bike">Bike</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Broker Name</span>
-                <select id="vehicleBrokerName">
-                  <option value="Self">Self</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Country of Origin</span>
-                <input id="countryOfOrigin" type="text" placeholder="e.g. Japan" autocomplete="off" />
-              </label>
-              <label class="field">
-                <span>Mileage (km)</span>
-                <input id="mileageKm" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 45000" />
-              </label>
-              <label class="field">
-                <span>Fuel Type</span>
-                <select id="fuelType">
-                  <option value="">Select</option>
-                  <option value="Petrol">Petrol</option>
-                  <option value="Diesel">Diesel</option>
-                  <option value="Electric (EV)">Electric (EV)</option>
-                  <option value="Hybrid">Hybrid</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Vehicle Condition</span>
-                <select id="vehicleCondition">
-                  <option value="">Select</option>
-                  <option value="Brand New">Brand New</option>
-                  <option value="Used">Used</option>
-                </select>
-              </label>
-              <div class="field field--full" id="leaseSection" hidden>
-                <span>Leasing Details (Used Vehicles)</span>
-                <div class="formGrid" style="padding:0; grid-template-columns: 1fr 1fr;">
-                  <label class="field">
-                    <span>Leasing</span>
-                    <select id="leasingStatus">
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span>Leasing Company</span>
-                    <input id="leasingCompany" type="text" placeholder="e.g. ABC Finance" />
-                  </label>
-                  <label class="field">
-                    <span>Lease Amount</span>
-                    <input id="leaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="field">
-                    <span>Lease Balance Amount</span>
-                    <input id="leaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="field">
-                    <span>Lease Period</span>
-                    <input id="leasePeriod" type="text" placeholder="e.g. 60 months" />
-                  </label>
-                  <label class="field field--full">
-                    <span>Lease Balance Period</span>
-                    <input id="leaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
-                  </label>
-                </div>
-              </div>
-              <label class="field">
-                <span>Engine CC</span>
-                <input id="engineCc" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 1500" />
-              </label>
-              <label class="field">
-                <span>Cost Price</span>
-                <input id="costPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
-              </label>
-              <label class="field">
-                <span>Selling Price</span>
-                <input id="sellPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required />
-              </label>
-              <div class="field field--full">
-                <span>Vehicle Image</span>
-                <div class="row">
-                  <label class="btn btn--primary" for="vehicleImageInput">Upload Image</label>
-                  <input id="vehicleImageInput" type="file" accept="image/*" hidden />
-                  <button class="btn btn--danger" type="button" id="btnClearVehicleImage">Remove Image</button>
-                  <div class="muted" id="vehicleImageHint">JPG/PNG recommended.</div>
-                </div>
-                <div class="imgPreviewWrap" id="vehicleImagePreviewWrap" hidden>
-                  <img id="vehicleImagePreview" alt="Vehicle" />
-                </div>
-              </div>
-              <label class="field field--full">
-                <span>Notes</span>
-                <textarea id="notes" rows="3" placeholder="optional"></textarea>
-              </label>
-            </div>
-
-            <div class="row row--between">
-              <button type="submit" class="btn btn--primary" id="btnSaveVehicle">Save</button>
-              <div class="row">
-                <button type="button" class="btn btn--ghost" id="btnClearVehicleForm">Clear</button>
-                <button type="button" class="btn btn--danger" id="btnDeleteVehicle" hidden>Delete</button>
-              </div>
-            </div>
-          </form>
-
-          <div class="card">
+        <div class="card">
             <div class="card__header">
               <h3>Inventory List</h3>
               <div class="row">
@@ -260,17 +136,12 @@
                 <select id="inventoryFilterStatus" class="input">
                   <option value="all">All</option>
                   <option value="available">Available</option>
-                  <option value="sold">Sold</option>
                 </select>
               </div>
             </div>
             <div class="card__footer" style="border-top:none;">
               <div class="row" style="justify-content: space-between; align-items: center;">
-                <div class="row">
-                  <span class="pill" id="invCountTotal">Total: 0</span>
-                  <button class="pill pill--ok" id="btnShowAvailable" type="button" title="Show available vehicles">Available: 0</button>
-                  <button class="pill pill--warn" id="btnShowSold" type="button" title="Show sold vehicles">Sold: 0</button>
-                </div>
+                <span class="pill" id="invCountTotal">Total: 0</span>
                 <button class="btn btn--ghost" id="btnShowAllInv" type="button" title="Show all vehicles">Show All</button>
               </div>
             </div>
@@ -284,7 +155,7 @@
                     <th class="num">Year</th>
                     <th>Make</th>
                     <th>Model</th>
-                    <th>Status</th>
+                    <th>Garage status</th>
                     <th class="num">Price</th>
                     <th>Docs</th>
                     <th class="actions">Actions</th>
@@ -295,14 +166,13 @@
             </div>
             <div class="card__footer muted" id="inventorySummary">0 vehicles</div>
           </div>
-        </div>
       </section>
 
       <section class="panel" id="panel-inventory-reports" data-panel="inventoryReports" role="tabpanel">
         <div class="panel__header">
           <div>
             <h2>Inventory Reports</h2>
-            <p class="muted">Stock on hand, waste, reorder points, and totals by vehicle type.</p>
+            <p class="muted">Totals by vehicle type (stock on hand, cost, and selling price).</p>
           </div>
           <div class="panel__actions">
             <button class="btn btn--primary" id="btnSaveInventoryReportSettings" type="button">Save Settings</button>
@@ -320,10 +190,6 @@
             <div class="kpi">
               <div class="muted">Stock on hand</div>
               <div class="kpi__value" id="kpiInvOnHand">0</div>
-            </div>
-            <div class="kpi">
-              <div class="muted">Total waste (settings)</div>
-              <div class="kpi__value" id="kpiInvWaste">0</div>
             </div>
             <div class="kpi">
               <div class="muted">Total cost price</div>
@@ -347,10 +213,6 @@
                 <tr>
                   <th>Vehicle Type</th>
                   <th class="num">Stock on hand</th>
-                  <th class="num">Waste</th>
-                  <th class="num">Reorder point</th>
-                  <th class="num">Effective stock</th>
-                  <th>Reorder</th>
                   <th class="num">Total Cost Price</th>
                   <th class="num">Total Selling Price</th>
                 </tr>
@@ -444,13 +306,19 @@
                 <span>Company Website</span>
                 <input id="companyWebsite" type="url" placeholder="Website (optional)" />
               </label>
-              <label class="field">
-                <span>Customer Name</span>
-                <input id="customerName" type="text" placeholder="optional" />
+              <label class="field field--full">
+                <span>Customer from list</span>
+                <select id="invoiceCustomerPick" class="input" title="Choose a saved customer; name and phone fill below">
+                  <option value="">— Select customer —</option>
+                </select>
               </label>
               <label class="field">
-                <span>Customer Phone</span>
-                <input id="customerPhone" type="tel" placeholder="optional" />
+                <span>Customer name</span>
+                <input id="invoiceCustomerName" type="text" placeholder="Walk-in or type name" autocomplete="name" />
+              </label>
+              <label class="field">
+                <span>Customer phone</span>
+                <input id="invoiceCustomerPhone" type="tel" placeholder="optional" autocomplete="tel" />
               </label>
               <label class="field">
                 <span>Payment Method</span>
@@ -466,16 +334,28 @@
                 <input id="invoiceNo" type="text" placeholder="auto" />
               </label>
               <label class="field">
-                <span>BEARING Amount (editable)</span>
-                <input id="bearingAmount" type="number" min="0" step="0.01" placeholder="auto from total" />
+                <span>BEARING Customer ID Number</span>
+                <input id="bearingAmount" type="text" placeholder="Customer ID / NIC / Passport No." />
               </label>
               <label class="field">
-                <span>For the Sum of LKR (editable)</span>
-                <input id="sumLkrAmount" type="number" min="0" step="0.01" placeholder="auto from total" />
+                <span>Paid Amount</span>
+                <input id="sumLkrAmount" type="number" min="0" step="0.01" placeholder="Enter paid amount" />
               </label>
               <label class="field field--full">
                 <span>Remarks</span>
                 <textarea id="invoiceRemarks" rows="3" placeholder="optional"></textarea>
+              </label>
+              <label class="field field--full">
+                <span class="row" style="justify-content:space-between;">
+                  <span>Immediate After-Billing (Invoice SMS)</span>
+                  <input id="invoiceSentAuto" type="checkbox" />
+                </span>
+                <textarea
+                  id="invoiceSentTemplate"
+                  rows="3"
+                  readonly
+                  title="Template used for immediate invoice SMS"
+                >Hi {{Customer Name}}, your invoice {{Invoice Number}} for {{Amount}}. Thank you for your business! - {{Company Name}}</textarea>
               </label>
             </div>
 
@@ -522,7 +402,7 @@
                 </div>
 
                 <div class="invoiceLine">
-                  BEARING <span id="invBearingAmount">0.00</span>
+                  BEARING ID NO: <span id="invBearingAmount">—</span>
                   for the sum of LKR <span id="invSumLkrAmount">0.00</span>
                   <span id="invSubtotal" hidden>0.00</span>
                   <span id="invDiscount" hidden>0.00</span>
@@ -580,11 +460,105 @@
         </div>
       </section>
 
+      <section class="panel" id="panel-quotation" data-panel="quotation" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Quotation</h2>
+            <p class="muted">Select customer and vehicle from inventory, then send or print the quotation.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--ghost" id="btnSaveQuotation" type="button">Save Quotation</button>
+            <button class="btn" id="btnSendQuotationWhatsapp" type="button">Send WhatsApp</button>
+            <button class="btn btn--primary" id="btnPrintQuotation" type="button">Print Quotation</button>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <div class="card__header">
+              <h3>Create Quotation</h3>
+            </div>
+            <div class="formGrid">
+              <label class="field">
+                <span>Date</span>
+                <input id="quotationDate" type="date" />
+              </label>
+              <label class="field">
+                <span>Valid Until</span>
+                <input id="quotationValidUntil" type="date" />
+              </label>
+              <label class="field">
+                <span>Customer (saved)</span>
+                <select id="quotationCustomerPick">
+                  <option value="">Select customer</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Customer Name</span>
+                <input id="quotationCustomerName" type="text" placeholder="Customer name" />
+              </label>
+              <label class="field">
+                <span>Customer Phone</span>
+                <input id="quotationCustomerPhone" type="tel" placeholder="Phone number" />
+              </label>
+              <label class="field field--full">
+                <span>Vehicle (from inventory)</span>
+                <select id="quotationVehiclePick">
+                  <option value="">Select vehicle</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Quoted Price</span>
+                <input id="quotationPrice" type="number" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label class="field">
+                <span>Remarks</span>
+                <input id="quotationRemarks" type="text" placeholder="Optional remarks" />
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>Quotation Preview</h3>
+            </div>
+            <div id="quotationPreview" class="muted">Select customer and vehicle to generate quotation preview.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card__header">
+            <h3>Saved Quotation List</h3>
+          </div>
+          <div class="tableWrap">
+            <table class="table" id="quotationTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th>Vehicle</th>
+                  <th>Valid Until</th>
+                  <th class="num">Amount</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card__footer muted" id="quotationSummary">0 quotations</div>
+        </div>
+      </section>
+
       <section class="panel" id="panel-ledger" data-panel="ledger" role="tabpanel">
         <div class="panel__header">
           <div>
             <h2>Ledger</h2>
             <p class="muted">Record income/expense entries. Sales auto-create income entries.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" type="button" id="btnAddNewLedgerEntry" title="Open add-ledger-entry window">
+              + Add new Ledger Entry
+            </button>
           </div>
         </div>
 
@@ -727,6 +701,47 @@
         </div>
       </section>
 
+      <section class="panel" id="panel-sold-vehicle-reports" data-panel="soldVehicleReports" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Sold Vehicle Reports</h2>
+            <p class="muted">List of all sold vehicles with invoice and customer details.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Sold Vehicles</h3>
+            <div class="row">
+              <input id="soldVehicleSearch" class="input" type="search" placeholder="Search invoice / stock / customer / make / model" />
+            </div>
+          </div>
+          <div class="tableWrap">
+            <table class="table" id="soldVehiclesTable">
+              <thead>
+                <tr>
+                  <th>Image</th>
+                  <th>Stock / VIN</th>
+                  <th class="num">Year</th>
+                  <th>Make</th>
+                  <th>Model</th>
+                  <th>Vehicle No</th>
+                  <th>Gear</th>
+                  <th>Docs</th>
+                  <th>Customer</th>
+                  <th>Invoice</th>
+                  <th>Sold Date</th>
+                  <th class="num">Sold Price</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card__footer muted" id="soldVehiclesSummary">0 sold vehicles</div>
+        </div>
+      </section>
+
       <section class="panel" id="panel-users" data-panel="users" role="tabpanel">
         <div class="panel__header">
           <div>
@@ -805,9 +820,14 @@
             <h2>Brokers</h2>
             <p class="muted">Manage broker contacts.</p>
           </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" type="button" id="btnAddNewBroker" title="Open add-broker window">
+              + Add new Broker
+            </button>
+          </div>
         </div>
         <div class="grid grid--2">
-          <form id="brokerForm" class="card">
+          <form id="brokerForm" class="card" hidden>
             <div class="card__header">
               <h3>Add Broker</h3>
               <span class="badge badge--soft">CRUD</span>
@@ -852,9 +872,14 @@
             <h2>Supplier</h2>
             <p class="muted">Manage supplier contacts.</p>
           </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" type="button" id="btnAddNewSupplier" title="Open add-supplier window">
+              + Add new Supplier
+            </button>
+          </div>
         </div>
         <div class="grid grid--2">
-          <form id="supplierForm" class="card">
+          <form id="supplierForm" class="card" hidden>
             <div class="card__header">
               <h3>Add Supplier</h3>
               <span class="badge badge--soft">CRUD</span>
@@ -897,35 +922,14 @@
         <div class="panel__header">
           <div>
             <h2>Purchase</h2>
-            <p class="muted">Record vehicle purchases (from supplier/broker).</p>
+            <p class="muted">Use <strong>+ Add new Purchase</strong> to open the form. Purchases are listed below.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" type="button" id="btnAddNewPurchase" title="Open add-purchase form">+ Add new Purchase</button>
           </div>
         </div>
-        <div class="grid grid--2">
-          <form id="purchaseForm" class="card">
-            <div class="card__header">
-              <h3>Add Purchase</h3>
-              <span class="badge badge--soft">Entry</span>
-            </div>
-            <div class="formGrid">
-              <label class="field"><span>Date</span><input id="purchaseDate" type="date" /></label>
-              <label class="field"><span>Source</span>
-                <select id="purchaseSource">
-                  <option value="supplier">Supplier</option>
-                  <option value="broker">Broker</option>
-                </select>
-              </label>
-              <label class="field"><span>Supplier/Broker</span><select id="purchaseParty"></select></label>
-              <label class="field"><span>Stock No.</span><input id="purchaseStockNo" type="text" placeholder="optional" /></label>
-              <label class="field"><span>Vehicle</span><input id="purchaseVehicle" type="text" placeholder="e.g. Toyota Corolla" required /></label>
-              <label class="field"><span>Cost</span><input id="purchaseCost" type="number" min="0" step="0.01" required /></label>
-              <label class="field field--full"><span>Notes</span><textarea id="purchaseNotes" rows="3"></textarea></label>
-            </div>
-            <div class="row row--between">
-              <button class="btn btn--primary" type="submit">Save</button>
-              <button class="btn btn--ghost" type="reset">Clear</button>
-            </div>
-          </form>
-          <div class="card">
+
+        <div class="card">
             <div class="card__header">
               <h3>Purchase List</h3>
               <input id="purchaseSearch" class="input" type="search" placeholder="Search purchases" />
@@ -933,16 +937,564 @@
             <div class="tableWrap">
               <table class="table" id="purchaseTable">
                 <thead>
-                  <tr><th>Date</th><th>Source</th><th>Party</th><th>Vehicle</th><th class="num">Cost</th></tr>
+                  <tr>
+                    <th>Date</th>
+                    <th>Source</th>
+                    <th>Party</th>
+                    <th>Stock</th>
+                    <th>Vehicle</th>
+                    <th class="num">Cost</th>
+                    <th class="num">Sell</th>
+                  </tr>
                 </thead>
                 <tbody></tbody>
               </table>
             </div>
             <div class="card__footer muted" id="purchaseSummary">0 purchases</div>
           </div>
+      </section>
+
+      <section class="panel" id="panel-garage" data-panel="garage" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Garage</h2>
+            <p class="muted">Log workshop jobs, service, and repairs — stock no. and Vehicle Number are tracked separately.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" type="button" id="btnAddNewGarageJob" title="Open add-garage-job form">+ Add new Garage job</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__header">
+            <h3>Job list</h3>
+            <input id="garageJobSearch" class="input" type="search" placeholder="Search jobs" />
+          </div>
+          <div class="tableWrap">
+            <table class="table" id="garageJobsTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Title</th>
+                  <th>Stock no.</th>
+                  <th>Vehicle Number</th>
+                  <th>Status</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card__footer muted" id="garageJobsSummary">0 jobs</div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-customer" data-panel="customer" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Customer</h2>
+            <p class="muted">Keep a contact list for follow-ups and billing references.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" type="button" id="btnAddNewCustomer" title="Open add-customer window">
+              + Add new Customer
+            </button>
+          </div>
+        </div>
+        <div class="grid grid--2">
+          <form id="customerForm" class="card" hidden>
+            <div class="card__header">
+              <h3>Add customer</h3>
+              <span class="badge badge--soft">CRUD</span>
+            </div>
+            <input type="hidden" id="customerId" />
+            <div class="formGrid">
+              <label class="field"><span>Name</span><input id="crmCustomerName" type="text" required /></label>
+              <label class="field"><span>Phone</span><input id="crmCustomerPhone" type="tel" /></label>
+              <label class="field"><span>Email</span><input id="customerEmail" type="email" /></label>
+              <label class="field field--full"><span>Address</span><input id="customerAddress" type="text" /></label>
+              <label class="field field--full"><span>Notes</span><textarea id="customerNotes" rows="3"></textarea></label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Save</button>
+              <div class="row">
+                <button class="btn btn--ghost" type="button" id="btnClearCustomerForm">Clear</button>
+                <button class="btn btn--danger" type="button" id="btnDeleteCustomer">Delete</button>
+              </div>
+            </div>
+          </form>
+          <div class="card">
+            <div class="card__header">
+              <h3>Customer list</h3>
+              <input id="customerSearch" class="input" type="search" placeholder="Search customers" />
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="customersTable">
+                <thead>
+                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="customersSummary">0 customers</div>
+          </div>
         </div>
       </section>
     </main>
+
+    <dialog class="dialog dialog--vehicle" id="customerFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="customerFormDialogTitle">Add customer</h3>
+            <span class="badge badge--soft" id="customerFormDialogBadge">CRUD</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseCustomerFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div id="customerFormDialogBody"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="ledgerEntryDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="ledgerEntryDialogTitle">Add Ledger Entry</h3>
+            <span class="badge badge--soft" id="ledgerEntryDialogBadge">Manual</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseLedgerEntryDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div id="ledgerEntryDialogBody"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="garageJobFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="garageJobFormDialogTitle">Garage job</h3>
+            <span class="badge badge--soft" id="garageJobFormDialogModeBadge">New</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseGarageJobFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <form id="garageJobForm" class="vehicleFormDialog__form">
+            <input type="hidden" id="garageJobId" />
+            <div class="formGrid">
+              <label class="field field--full">
+                <span>Job title</span>
+                <input id="garageJobTitle" type="text" placeholder="e.g. Oil change, Brake service" required />
+              </label>
+              <label class="field">
+                <span>Stock no.</span>
+                <input id="garageJobStockNo" type="text" placeholder="e.g. STK-001" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle Number</span>
+                <input id="garageJobVehicleNumber" type="text" placeholder="e.g. ABC-1234" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Status</span>
+                <select id="garageJobStatus">
+                  <option value="In progress">In progress</option>
+                  <option value="Done">Done</option>
+                </select>
+              </label>
+              <label class="field field--full">
+                <span>Notes</span>
+                <textarea id="garageJobNotes" rows="4" placeholder="Parts, labour, remarks…"></textarea>
+              </label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Save job</button>
+              <div class="row">
+                <button class="btn btn--ghost" type="button" id="btnClearGarageJobForm">Clear</button>
+                <button class="btn btn--danger" type="button" id="btnDeleteGarageJob">Delete</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="brokerFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="brokerFormDialogTitle">Add Broker</h3>
+            <span class="badge badge--soft" id="brokerFormDialogBadge">CRUD</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseBrokerFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div id="brokerFormDialogBody"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="supplierFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="supplierFormDialogTitle">Add Supplier</h3>
+            <span class="badge badge--soft" id="supplierFormDialogBadge">CRUD</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseSupplierFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div id="supplierFormDialogBody"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="purchaseFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="purchaseFormDialogTitle">Add Purchase</h3>
+            <span class="badge badge--soft" id="purchaseFormDialogBadge">Full vehicle details</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnClosePurchaseFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <form id="purchaseForm" class="vehicleFormDialog__form">
+            <div class="formGrid">
+              <label class="field">
+                <span>Purchase date</span>
+                <input id="purchaseDate" type="date" required />
+              </label>
+              <label class="field">
+                <span>Source</span>
+                <select id="purchaseSource">
+                  <option value="supplier">Supplier</option>
+                  <option value="broker">Broker</option>
+                </select>
+              </label>
+              <label class="field field--full">
+                <span>Supplier / broker</span>
+                <select id="purchaseParty" required></select>
+              </label>
+
+              <label class="field">
+                <span>Stock No.</span>
+                <input id="purchaseStockNo" type="text" placeholder="e.g. STK-001" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>VIN / Chassis</span>
+                <input id="purchaseVin" type="text" placeholder="optional" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Make</span>
+                <input id="purchaseMake" type="text" placeholder="e.g. Toyota" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Model</span>
+                <input id="purchaseModel" type="text" placeholder="e.g. Corolla" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Year</span>
+                <input id="purchaseYear" type="number" inputmode="numeric" min="1900" max="2100" placeholder="e.g. 2020" />
+              </label>
+              <label class="field">
+                <span>Color</span>
+                <input id="purchaseColor" type="text" placeholder="optional" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle number</span>
+                <input id="purchaseVehicleNumber" type="text" placeholder="e.g. ABC-1234" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle type</span>
+                <select id="purchaseVehicleType">
+                  <option value="">Select</option>
+                  <option value="Car">Car</option>
+                  <option value="Van">Van</option>
+                  <option value="Bus">Bus</option>
+                  <option value="Truck">Truck</option>
+                  <option value="Pickup">Pickup</option>
+                  <option value="Bike">Bike</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Broker name</span>
+                <select id="purchaseVehicleBrokerName">
+                  <option value="Self">Self</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Country of origin</span>
+                <input id="purchaseCountryOfOrigin" type="text" placeholder="e.g. Japan" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Mileage (km)</span>
+                <input id="purchaseMileageKm" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 45000" />
+              </label>
+              <label class="field">
+                <span>Fuel type</span>
+                <select id="purchaseFuelType">
+                  <option value="">Select</option>
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Electric (EV)">Electric (EV)</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Gear system</span>
+                <select id="purchaseGearSystem">
+                  <option value="">Select</option>
+                  <option value="Manual">Manual</option>
+                  <option value="Automatic">Automatic</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Vehicle condition</span>
+                <select id="purchaseVehicleCondition">
+                  <option value="">Select</option>
+                  <option value="Brand New">Brand New</option>
+                  <option value="Used">Used</option>
+                </select>
+              </label>
+              <div class="field field--full" id="purchaseLeaseSection" hidden>
+                <span>Leasing details (used vehicles)</span>
+                <div class="formGrid" style="padding: 0; grid-template-columns: 1fr 1fr">
+                  <label class="field">
+                    <span>Leasing</span>
+                    <select id="purchaseLeasingStatus">
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Leasing company</span>
+                    <input id="purchaseLeasingCompany" type="text" placeholder="e.g. ABC Finance" />
+                  </label>
+                  <label class="field">
+                    <span>Lease amount</span>
+                    <input id="purchaseLeaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="field">
+                    <span>Lease balance amount</span>
+                    <input id="purchaseLeaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="field">
+                    <span>Lease period</span>
+                    <input id="purchaseLeasePeriod" type="text" placeholder="e.g. 60 months" />
+                  </label>
+                  <label class="field field--full">
+                    <span>Lease balance period</span>
+                    <input id="purchaseLeaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
+                  </label>
+                </div>
+              </div>
+              <label class="field">
+                <span>Engine CC</span>
+                <input id="purchaseEngineCc" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 1500" />
+              </label>
+              <label class="field">
+                <span>Cost price</span>
+                <input id="purchaseCostPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field">
+                <span>Selling price</span>
+                <input id="purchaseSellPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <div class="field field--full">
+                <span>Vehicle image</span>
+                <div class="row">
+                  <label class="btn btn--primary" for="purchaseImageInput">Upload image</label>
+                  <input id="purchaseImageInput" type="file" accept="image/*" hidden />
+                  <button class="btn btn--danger" type="button" id="btnClearPurchaseImage">Remove image</button>
+                  <div class="muted" id="purchaseImageHint">JPG/PNG recommended.</div>
+                </div>
+                <div class="imgPreviewWrap" id="purchaseImagePreviewWrap" hidden>
+                  <img id="purchaseImagePreview" alt="Purchase vehicle" />
+                </div>
+              </div>
+              <label class="field field--full">
+                <span>Notes</span>
+                <textarea id="purchaseNotes" rows="3" placeholder="optional"></textarea>
+              </label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Save purchase</button>
+              <button class="btn btn--ghost" type="button" id="btnResetPurchaseForm">Clear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="vehicleFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;" id="vehicleFormTitle">Add Vehicle</h3>
+            <span class="badge" id="vehicleFormModeBadge">New</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseVehicleFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <form id="vehicleForm" class="vehicleFormDialog__form">
+            <input type="hidden" id="vehicleId" />
+
+            <div class="formGrid">
+              <label class="field">
+                <span>Stock No.</span>
+                <input id="stockNo" type="text" placeholder="e.g. STK-001" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>VIN / Chassis</span>
+                <input id="vin" type="text" placeholder="optional" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Make</span>
+                <input id="make" type="text" placeholder="e.g. Toyota" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Model</span>
+                <input id="model" type="text" placeholder="e.g. Corolla" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Year</span>
+                <input id="year" type="number" inputmode="numeric" min="1900" max="2100" placeholder="e.g. 2020" />
+              </label>
+              <label class="field">
+                <span>Color</span>
+                <input id="color" type="text" placeholder="optional" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle Number</span>
+                <input id="vehicleNumber" type="text" placeholder="e.g. ABC-1234" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Vehicle Type</span>
+                <select id="vehicleType">
+                  <option value="">Select</option>
+                  <option value="Car">Car</option>
+                  <option value="Van">Van</option>
+                  <option value="Bus">Bus</option>
+                  <option value="Truck">Truck</option>
+                  <option value="Pickup">Pickup</option>
+                  <option value="Bike">Bike</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Broker Name</span>
+                <select id="vehicleBrokerName">
+                  <option value="Self">Self</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Country of Origin</span>
+                <input id="countryOfOrigin" type="text" placeholder="e.g. Japan" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>Mileage (km)</span>
+                <input id="mileageKm" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 45000" />
+              </label>
+              <label class="field">
+                <span>Fuel Type</span>
+                <select id="fuelType">
+                  <option value="">Select</option>
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Electric (EV)">Electric (EV)</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Gear system</span>
+                <select id="gearSystem">
+                  <option value="">Select</option>
+                  <option value="Manual">Manual</option>
+                  <option value="Automatic">Automatic</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Vehicle Condition</span>
+                <select id="vehicleCondition">
+                  <option value="">Select</option>
+                  <option value="Brand New">Brand New</option>
+                  <option value="Used">Used</option>
+                </select>
+              </label>
+              <div class="field field--full" id="leaseSection" hidden>
+                <span>Leasing Details (Used Vehicles)</span>
+                <div class="formGrid" style="padding:0; grid-template-columns: 1fr 1fr;">
+                  <label class="field">
+                    <span>Leasing</span>
+                    <select id="leasingStatus">
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Leasing Company</span>
+                    <input id="leasingCompany" type="text" placeholder="e.g. ABC Finance" />
+                  </label>
+                  <label class="field">
+                    <span>Lease Amount</span>
+                    <input id="leaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="field">
+                    <span>Lease Balance Amount</span>
+                    <input id="leaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                  </label>
+                  <label class="field">
+                    <span>Lease Period</span>
+                    <input id="leasePeriod" type="text" placeholder="e.g. 60 months" />
+                  </label>
+                  <label class="field field--full">
+                    <span>Lease Balance Period</span>
+                    <input id="leaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
+                  </label>
+                </div>
+              </div>
+              <label class="field">
+                <span>Engine CC</span>
+                <input id="engineCc" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 1500" />
+              </label>
+              <label class="field">
+                <span>Cost Price</span>
+                <input id="costPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label class="field">
+                <span>Selling Price</span>
+                <input id="sellPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required />
+              </label>
+              <div class="field field--full">
+                <span>Vehicle Image</span>
+                <div class="row">
+                  <label class="btn btn--primary" for="vehicleImageInput">Upload Image</label>
+                  <input id="vehicleImageInput" type="file" accept="image/*" hidden />
+                  <button class="btn btn--danger" type="button" id="btnClearVehicleImage">Remove Image</button>
+                  <div class="muted" id="vehicleImageHint">JPG/PNG recommended.</div>
+                </div>
+                <div class="imgPreviewWrap" id="vehicleImagePreviewWrap" hidden>
+                  <img id="vehicleImagePreview" alt="Vehicle" />
+                </div>
+              </div>
+              <label class="field field--full">
+                <span>Notes</span>
+                <textarea id="notes" rows="3" placeholder="optional"></textarea>
+              </label>
+            </div>
+
+            <div class="row row--between">
+              <button type="submit" class="btn btn--primary" id="btnSaveVehicle">Save</button>
+              <div class="row">
+                <button type="button" class="btn btn--ghost" id="btnClearVehicleForm">Clear</button>
+                <button type="button" class="btn btn--danger" id="btnDeleteVehicle" hidden>Delete</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
 
     <dialog class="dialog" id="docsDialog">
       <form method="dialog" class="dialog__card" id="docsDialogForm">

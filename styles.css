@@ -149,7 +149,7 @@ p { margin: 6px 0 0; }
 .navItem {
   position: relative;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   color: var(--ink);
   padding: 10px 18px;
   min-height: 42px;
@@ -168,9 +168,9 @@ p { margin: 6px 0 0; }
     color 0.18s ease;
 }
 .navItem:hover {
-  background: var(--surface-subtle);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
 }
 .navItem:focus-visible {
   outline: none;
@@ -216,9 +216,10 @@ details.menu > summary.navItem::after {
   transition: transform 0.22s ease, opacity 0.15s ease;
 }
 details.menu[open] > summary.navItem {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: var(--primary-soft);
+  border-color: rgba(37, 99, 235, 0.5);
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.14) 0%, rgba(37, 99, 235, 0.08) 100%);
   color: var(--primary-hover);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
 }
 details.menu[open] > summary.navItem::after {
   transform: rotate(225deg);
@@ -242,6 +243,59 @@ details.menu[open] > summary.navItem::after {
   gap: 2px;
   z-index: 50;
   animation: menuPanelIn 0.2s ease;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.menu__panel::-webkit-scrollbar {
+  width: 10px;
+}
+.menu__panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.menu__panel::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--border-strong) 78%, #ffffff 22%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.menu__panel::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--border-strong) 90%, #ffffff 10%);
+  background-clip: content-box;
+}
+
+/* Sub-menu inside the main menu dropdown */
+.menu__panel--sub {
+  position: static;
+  width: 100%;
+  box-shadow: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: none;
+}
+
+.menu__panel--sub::before {
+  content: none;
+}
+
+.reportsSubMenu > summary.menu__item {
+  /* Ensure the summary behaves like other items */
+  cursor: pointer;
+}
+
+.reportsSubMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reportsSubMenu[open] > summary.menu__item {
+  background: var(--surface-subtle);
+  border-color: var(--border);
 }
 @keyframes menuPanelIn {
   from {
@@ -286,11 +340,13 @@ details.menu[open] > summary.navItem::after {
     background 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
-    padding-left 0.15s ease;
+    padding-left 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .menu__item:hover {
-  background: var(--surface-subtle);
-  border-color: var(--border);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
 }
 .menu__item:active {
   background: var(--surface-muted);
@@ -447,12 +503,12 @@ details.menu[open] > summary.navItem::after {
 }
 
 .homeHero__card {
-  width: min(640px, 100%);
+  width: min(760px, 100%);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-md);
-  padding: clamp(28px, 4vw, 40px);
+  padding: clamp(32px, 4.2vw, 48px);
   position: relative;
 }
 .homeHero__eyebrow {
@@ -464,7 +520,7 @@ details.menu[open] > summary.navItem::after {
   margin-bottom: 10px;
 }
 .homeHero__title {
-  font-size: clamp(1.65rem, 3.5vw, 2rem);
+  font-size: clamp(1.75rem, 3.7vw, 2.15rem);
   font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.2;
@@ -481,6 +537,54 @@ details.menu[open] > summary.navItem::after {
   gap: 12px;
   flex-wrap: wrap;
 }
+.homeQuickNav {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.homeQuickNav__btn {
+  min-height: 48px;
+  font-weight: 700;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.24);
+  transition: transform 0.12s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+.homeQuickNav__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+  filter: saturate(1.04);
+}
+.homeQuickNav__btn:active {
+  transform: translateY(0);
+}
+
+.homeHero__quickSearchCard {
+  margin-top: 20px;
+}
+
+.homeHero__quickSearchRow {
+  margin-bottom: 14px;
+}
+
+.homeHero__quickSearchFooter {
+  margin-top: 10px;
+}
+
+/* Desktop-only upscale for home dashboard */
+@media (min-width: 1024px) {
+  .homeHero__card {
+    width: min(860px, 100%);
+    padding: 40px 44px;
+  }
+  .homeHero__title {
+    font-size: clamp(2rem, 2.7vw, 2.35rem);
+  }
+  .homeQuickNav__btn {
+    min-height: 52px;
+    font-size: 15px;
+  }
+}
 .homeHero__hint { margin-top: 20px; font-size: 13px; line-height: 1.5; }
 
 /* Mobile + tablet ergonomics */
@@ -495,6 +599,7 @@ details.menu[open] > summary.navItem::after {
 
   .mainNav { justify-content: flex-start; }
   .navItem { white-space: nowrap; }
+  .homeQuickNav { grid-template-columns: 1fr 1fr; }
 
   /* Main menu dropdown should not overlay on mobile */
   .menu { width: 100%; }
@@ -874,6 +979,11 @@ input::placeholder, textarea::placeholder { color: rgba(11, 18, 32, 0.35); }
   background: rgba(217, 119, 6, 0.08);
   color: #b45309;
 }
+.pill--garage {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
 
 .totals { padding: 12px 14px 14px; display: grid; gap: 10px; }
 .totals__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -986,6 +1096,34 @@ input::placeholder, textarea::placeholder { color: rgba(11, 18, 32, 0.35); }
 .dialog__footer { padding: 12px 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
 
 .dialog__card--login { width: min(520px, calc(100vw - 24px)); }
+
+/* Vehicle add/edit — compact scrollable window */
+.dialog--vehicle[open] {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(12px, 2vh) 12px;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+}
+.dialog__card--vehicle {
+  width: min(680px, calc(100vw - 24px));
+  max-height: min(880px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog__body--vehicle {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+.vehicleFormDialog__form .formGrid {
+  margin-top: 0;
+}
 
 /* —— Full-screen style login (E-Inventory) —— */
 .dialog--login {
