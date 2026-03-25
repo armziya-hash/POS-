@@ -26,7 +26,7 @@ try {
 }
 
 $stmt = $pdo->prepare(
-    'SELECT id, username, name, role, disabled, password_hash, permissions FROM pos_users WHERE LOWER(username) = ? LIMIT 1'
+    'SELECT id, username, name, role, business_id, disabled, password_hash, permissions FROM pos_users WHERE LOWER(username) = ? LIMIT 1'
 );
 $stmt->execute([$username]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -57,6 +57,7 @@ jsonOut([
         'username' => (string) $row['username'],
         'name' => (string) $row['name'],
         'role' => $role,
+        'businessId' => $row['business_id'] !== null ? (string) $row['business_id'] : null,
         'permissions' => $permissions,
     ],
 ]);

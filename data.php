@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 
-const POS_DATA_ROW_ID = 1;
+const POS_DEFAULT_BUSINESS_ID = 'biz_default';
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
@@ -15,8 +15,12 @@ try {
 
 if ($method === 'GET') {
     requirePosApiKey();
-    $stmt = $pdo->prepare('SELECT payload FROM pos_data WHERE id = ?');
-    $stmt->execute([POS_DATA_ROW_ID]);
+    $biz = $_SERVER['HTTP_X_POS_BUSINESS_ID'] ?? '';
+    if (!is_string($biz) || trim($biz) === '') {
+        $biz = POS_DEFAULT_BUSINESS_ID;
+    }
+    $stmt = $pdo->prepare('SELECT payload FROM pos_data WHERE business_id = ?');
+    $stmt->execute([$biz]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         jsonOut(['ok' => true, 'data' => null]);
@@ -34,14 +38,18 @@ if ($method === 'POST') {
     if ($body === null) {
         jsonOut(['ok' => false, 'error' => 'Expected JSON body'], 400);
     }
+    $biz = $_SERVER['HTTP_X_POS_BUSINESS_ID'] ?? '';
+    if (!is_string($biz) || trim($biz) === '') {
+        $biz = POS_DEFAULT_BUSINESS_ID;
+    }
     $enc = json_encode($body, JSON_UNESCAPED_UNICODE);
     if ($enc === false) {
         jsonOut(['ok' => false, 'error' => 'Could not encode JSON'], 400);
     }
-    $sql = 'INSERT INTO pos_data (id, payload) VALUES (?, ?)
+    $sql = 'INSERT INTO pos_data (business_id, payload) VALUES (?, ?)
             ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = CURRENT_TIMESTAMP';
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([POS_DATA_ROW_ID, $enc]);
+    $stmt->execute([$biz, $enc]);
     jsonOut(['ok' => true]);
 }
 

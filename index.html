@@ -60,6 +60,7 @@
             <button class="menu__item" type="button" data-nav="suppliers">Supplier</button>
             <div class="menu__sep"></div>
             <button class="menu__item" type="button" data-nav="users">Users</button>
+            <button class="menu__item" type="button" data-nav="businesses">Businesses</button>
             <div class="menu__sep"></div>
             <div class="menu__account">
               <div class="menu__accountHeading">Account</div>
@@ -811,6 +812,83 @@
             </div>
             <div class="card__footer muted" id="usersSummary">0 users</div>
           </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-businesses" data-panel="businesses" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Businesses</h2>
+            <p class="muted">Super Admin only. Create businesses and business admin accounts.</p>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <form id="businessForm" class="card">
+            <div class="card__header">
+              <h3>Create Business</h3>
+              <span class="badge badge--soft">Super Admin</span>
+            </div>
+            <div class="formGrid">
+              <label class="field field--full">
+                <span>Business name</span>
+                <input id="businessName" type="text" placeholder="e.g. City Motors" required />
+              </label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Create</button>
+              <button class="btn btn--ghost" type="reset">Clear</button>
+            </div>
+          </form>
+
+          <form id="businessAdminForm" class="card">
+            <div class="card__header">
+              <h3>Create Business Admin</h3>
+              <span class="badge badge--soft">Admin</span>
+            </div>
+            <div class="formGrid">
+              <label class="field field--full">
+                <span>Business</span>
+                <select id="businessPick" required>
+                  <option value="">Select business</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Username</span>
+                <input id="businessAdminUsername" type="text" autocomplete="off" required />
+              </label>
+              <label class="field">
+                <span>Display Name</span>
+                <input id="businessAdminName" type="text" autocomplete="off" required />
+              </label>
+              <label class="field field--full">
+                <span>Password</span>
+                <input id="businessAdminPassword" type="password" autocomplete="new-password" required />
+              </label>
+            </div>
+            <div class="row row--between">
+              <button class="btn btn--primary" type="submit">Create Admin</button>
+              <button class="btn btn--ghost" type="reset">Clear</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card__header">
+            <h3>Business List</h3>
+          </div>
+          <div class="tableWrap">
+            <table class="table" id="businessesTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>ID</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card__footer muted" id="businessesSummary">0 businesses</div>
         </div>
       </section>
 

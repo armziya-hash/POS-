@@ -24,15 +24,23 @@ function rowToUser(array $row): array
         'username' => (string) $row['username'],
         'name' => (string) $row['name'],
         'role' => $role,
+        'businessId' => $row['business_id'] !== null ? (string) $row['business_id'] : null,
         'disabled' => (int) $row['disabled'] === 1,
-        'permissions' => $perms ?? ($role === 'admin' ? ['*'] : []),
+        'permissions' => $perms ?? (($role === 'admin' || $role === 'superadmin') ? ['*'] : []),
         'createdAt' => $row['created_at'] ? (string) $row['created_at'] : null,
     ];
 }
 
 if ($method === 'GET') {
     requirePosApiKey();
-    $stmt = $pdo->query('SELECT id, username, name, role, disabled, permissions, created_at FROM pos_users ORDER BY username');
+    $biz = $_SERVER['HTTP_X_POS_BUSINESS_ID'] ?? '';
+    $biz = is_string($biz) ? trim($biz) : '';
+    if ($biz === '') {
+        // Multi-business mode: users list must be scoped to an active business.
+        jsonOut(['ok' => true, 'users' => []]);
+    }
+    $stmt = $pdo->prepare('SELECT id, username, name, role, business_id, disabled, permissions, created_at FROM pos_users WHERE business_id = ? ORDER BY username');
+    $stmt->execute([$biz]);
     $users = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $users[] = rowToUser($row);
@@ -51,8 +59,9 @@ if ($method === 'POST') {
     $name = isset($body['name']) ? trim((string) $body['name']) : '';
     $role = isset($body['role']) ? trim((string) $body['role']) : '';
     $permissions = $body['permissions'] ?? null;
+    $businessId = isset($body['businessId']) ? trim((string) $body['businessId']) : null;
 
-    $allowedRoles = ['cashier', 'supervisor', 'manager', 'admin'];
+    $allowedRoles = ['cashier', 'supervisor', 'manager', 'admin', 'superadmin'];
     if ($username === '' || $password === '' || $name === '' || !in_array($role, $allowedRoles, true)) {
         jsonOut(['ok' => false, 'error' => 'Invalid user fields'], 400);
     }
@@ -71,21 +80,29 @@ if ($method === 'POST') {
         : ('usr_' . bin2hex(random_bytes(8)));
 
     $permJson = null;
-    if ($role === 'admin') {
+    if ($role === 'admin' || $role === 'superadmin') {
         $permJson = null;
     } elseif (is_array($permissions)) {
         $permJson = json_encode(array_values($permissions), JSON_UNESCAPED_UNICODE);
     }
 
+    if ($role === 'superadmin') {
+        $businessId = null;
+    } else {
+        if (!is_string($businessId) || trim($businessId) === '') {
+            jsonOut(['ok' => false, 'error' => 'businessId required'], 400);
+        }
+    }
+
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
     $ins = $pdo->prepare(
-        'INSERT INTO pos_users (id, username, password_hash, name, role, disabled, permissions, created_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?)'
+        'INSERT INTO pos_users (id, username, password_hash, name, role, business_id, disabled, permissions, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)'
     );
-    $ins->execute([$id, $username, $hash, $name, $role, $permJson, $now]);
+    $ins->execute([$id, $username, $hash, $name, $role, $businessId, $permJson, $now]);
 
-    $stmt = $pdo->prepare('SELECT id, username, name, role, disabled, permissions, created_at FROM pos_users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, username, name, role, business_id, disabled, permissions, created_at FROM pos_users WHERE id = ?');
     $stmt->execute([$id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     jsonOut(['ok' => true, 'user' => rowToUser($row)]);
@@ -125,7 +142,7 @@ if ($method === 'PUT') {
         }
     }
 
-    $stmt = $pdo->prepare('SELECT id, username, name, role, disabled, permissions, created_at FROM pos_users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, username, name, role, business_id, disabled, permissions, created_at FROM pos_users WHERE id = ?');
     $stmt->execute([$id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     jsonOut(['ok' => true, 'user' => rowToUser($row)]);

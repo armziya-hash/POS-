@@ -5,6 +5,7 @@ const AUTH_KEY = "vehicle_pos_auth_v1";
 const SESSION_KEY = "vehicle_pos_session_v1";
 /** When "Keep me logged in" is used, session is also stored here (survives browser restart). */
 const SESSION_PERSIST_KEY = "vehicle_pos_session_persist_v1";
+const DEFAULT_BUSINESS_ID = "biz_default";
 const INVOICE_SENT_TEMPLATE =
   "Hi {{Customer Name}}, your invoice {{Invoice Number}} for {{Amount}}. Thank you for your business! - {{Company Name}}";
 const INVOICE_SENT_TEMPLATE_OLD =
@@ -71,6 +72,7 @@ const ROLE_PERMS = {
     PERMS.DATA_IMPORT_EXPORT,
   ],
   admin: ["*"],
+  superadmin: ["*"],
 };
 
 function uid(prefix = "id") {
@@ -211,12 +213,21 @@ function normalizeImportedDb(parsed) {
   };
 }
 
+function getActiveBusinessId() {
+  const u = currentUser();
+  if (!u) return null;
+  if (u.role === "superadmin") return auth.session?.activeBusinessId || null;
+  return u.businessId || DEFAULT_BUSINESS_ID;
+}
+
 async function fetchPosApi(path, options = {}) {
   const base = POS_API_BASE.replace(/\/?$/, "");
   const p = path.replace(/^\//, "");
   const url = `${base}/${p}`;
   const headers = { ...(options.headers || {}) };
   if (POS_API_KEY) headers["X-POS-API-Key"] = POS_API_KEY;
+  const biz = getActiveBusinessId();
+  if (biz) headers["X-POS-Business-Id"] = biz;
   if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
@@ -242,12 +253,48 @@ async function flushDbRemoteNow() {
 
 async function refreshUsersFromServer() {
   if (!useRemoteDb) return;
+  if (isSuperAdmin() && !getActiveBusinessId()) {
+    auth.users = [];
+    auth.updatedAt = nowIso();
+    saveAuth(auth);
+    return;
+  }
   const { ok, body } = await fetchPosApi("users.php", { method: "GET" });
   if (ok && body && body.ok && Array.isArray(body.users)) {
     auth.users = body.users;
     auth.updatedAt = nowIso();
     saveAuth(auth);
   }
+}
+
+let businessesCache = [];
+
+async function refreshBusinessesFromServer() {
+  if (!useRemoteDb) return;
+  const { ok, body } = await fetchPosApi("businesses.php", { method: "GET" });
+  if (ok && body && body.ok && Array.isArray(body.businesses)) {
+    businessesCache = body.businesses;
+  }
+}
+
+async function loadBusinessData() {
+  if (!useRemoteDb) return;
+  const biz = getActiveBusinessId();
+  if (!biz) return;
+  const { ok, body } = await fetchPosApi("data.php", { method: "GET" });
+  if (!ok || !body || !body.ok) return;
+  if (body.data != null) {
+    db = normalizeImportedDb(body.data);
+    saveDb(db);
+    renderAll();
+    toast("Business data loaded.");
+    return;
+  }
+  // Initialize empty business snapshot
+  db = createEmptyDb();
+  persist();
+  renderAll();
+  toast("Business initialized.");
 }
 
 async function initRemoteStorage() {
@@ -263,13 +310,7 @@ async function initRemoteStorage() {
     auth.users = ur.body.users;
     auth.updatedAt = nowIso();
     saveAuth(auth);
-
-    if (dr.body.data != null) {
-      db = normalizeImportedDb(dr.body.data);
-      saveDb(db);
-    } else {
-      await flushDbRemoteNow();
-    }
+    // In multi-business mode, data is loaded after login based on businessId.
   } catch {
     useRemoteDb = false;
   }
@@ -332,6 +373,10 @@ function currentUser() {
   return auth.session?.user ?? null;
 }
 
+function isSuperAdmin() {
+  return currentUser()?.role === "superadmin";
+}
+
 function isAdmin() {
   return currentUser()?.role === "admin";
 }
@@ -343,7 +388,7 @@ function rolePerms(role) {
 function can(perm) {
   const u = currentUser();
   if (!u) return false;
-  if (u.role === "admin") return true;
+  if (u.role === "admin" || u.role === "superadmin") return true;
 
   // Prefer explicit permissions if present on session (created users), but
   // fall back to role mapping to support older saved users/sessions.
@@ -388,10 +433,42 @@ function updateMainMenuAccount() {
   const uname = escapeHtml(u.username);
   const role = escapeHtml(String(u.role || "").toUpperCase());
   const started = escapeHtml(formatSessionStarted(auth.session?.loggedInAt));
+  const bizLine = u.businessId
+    ? `<p class="menu__accountMuted">Business: <span class="pill">${escapeHtml(u.businessId)}</span></p>`
+    : "";
+  const superAdminBizSwitch = isSuperAdmin()
+    ? `
+      <div style="margin-top:10px;">
+        <div class="menu__accountMuted" style="margin-bottom:6px;">Active business</div>
+        <select id="activeBusinessPick" class="input" style="min-height:42px;">
+          <option value="">— Select business —</option>
+          ${(businessesCache || [])
+            .map((b) => `<option value="${escapeAttr(b.id)}">${escapeHtml(b.name || b.id)}</option>`)
+            .join("")}
+        </select>
+        <div class="muted" style="margin-top:6px;font-size:12px;">Select a business to load its data.</div>
+      </div>
+    `
+    : "";
   el.innerHTML = `
     <p class="menu__accountStrong">${name}</p>
     <p class="menu__accountMuted">@${uname} · ${role}</p>
-    <p class="menu__accountSession">Signed in: ${started}</p>`;
+    ${bizLine}
+    <p class="menu__accountSession">Signed in: ${started}</p>
+    ${superAdminBizSwitch}
+  `;
+
+  if (isSuperAdmin()) {
+    const pick = document.querySelector("#activeBusinessPick");
+    if (pick) {
+      pick.value = auth.session?.activeBusinessId || "";
+      pick.onchange = async () => {
+        auth.session.activeBusinessId = pick.value || "";
+        saveSession(auth.session);
+        if (auth.session.activeBusinessId) await loadBusinessData();
+      };
+    }
+  }
 }
 
 function canAccessGarageCustomer() {
@@ -511,6 +588,7 @@ function setUserUi() {
     ...(can(PERMS.REPORTS_VIEW) ? ["reports", "soldVehicleReports"] : []),
     ...(canAccessGarageCustomer() ? ["garage", "customer"] : []),
     ...(can(PERMS.USERS_MANAGE) ? ["users"] : []),
+    ...(isSuperAdmin() ? ["businesses"] : []),
     ...(isAdmin() ? ["brokers", "purchase", "suppliers"] : []),
   ];
 
@@ -625,6 +703,7 @@ async function login(username, password) {
         username: u.username,
         name: u.name,
         role: u.role,
+        businessId: u.businessId ?? null,
         permissions: Array.isArray(u.permissions) ? u.permissions : ROLE_PERMS[u.role] ?? [],
       },
       loggedInAt: nowIso(),
@@ -635,6 +714,10 @@ async function login(username, password) {
     setUserUi();
     closeLogin();
     toast(`Logged in as ${u.role}.`);
+    await refreshBusinessesFromServer();
+    if (!isSuperAdmin()) {
+      await loadBusinessData();
+    }
     return true;
   }
 
@@ -685,6 +768,13 @@ function renderUsers() {
   tbody.innerHTML = "";
   const q = ($("#userSearch").value || "").trim();
 
+  if (isSuperAdmin() && !getActiveBusinessId()) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">Select an Active Business from Main Menu → Account.</td></tr>`;
+    const summary = document.querySelector("#usersSummary");
+    if (summary) summary.textContent = "0 users";
+    return;
+  }
+
   const list = (auth.users || [])
     .slice()
     .sort((a, b) => normalizeUsername(a.username).localeCompare(normalizeUsername(b.username)))
@@ -724,6 +814,75 @@ function renderUsers() {
   }
 
   $("#usersSummary").textContent = `${list.length} user${list.length === 1 ? "" : "s"}`;
+}
+
+async function createBusinessFromForm(e) {
+  e.preventDefault();
+  if (!isSuperAdmin()) return toast("Super Admin only.");
+  const name = (document.querySelector("#businessName")?.value || "").trim();
+  if (!name) return toast("Business name required.");
+  const { ok, body } = await fetchPosApi("businesses.php", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  if (!ok || !body || !body.ok) return toast(body?.error || "Could not create business.");
+  document.querySelector("#businessForm")?.reset();
+  await refreshBusinessesFromServer();
+  renderBusinessesUi();
+  toast("Business created.");
+}
+
+async function createBusinessAdminFromForm(e) {
+  e.preventDefault();
+  if (!isSuperAdmin()) return toast("Super Admin only.");
+  const businessId = (document.querySelector("#businessPick")?.value || "").trim();
+  const username = normalizeUsername(document.querySelector("#businessAdminUsername")?.value || "");
+  const name = (document.querySelector("#businessAdminName")?.value || "").trim();
+  const password = document.querySelector("#businessAdminPassword")?.value || "";
+  if (!businessId || !username || !name || !password) return toast("Fill all fields.");
+  const { ok, body } = await fetchPosApi("users.php", {
+    method: "POST",
+    body: JSON.stringify({
+      username,
+      name,
+      role: "admin",
+      password,
+      businessId,
+      permissions: ["*"],
+    }),
+  });
+  if (!ok || !body || !body.ok) return toast(body?.error || "Could not create admin.");
+  document.querySelector("#businessAdminForm")?.reset();
+  toast("Business admin created.");
+}
+
+function renderBusinessesUi() {
+  const tbody = document.querySelector("#businessesTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  for (const b of businessesCache || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(b.name || "")}</strong></td>
+      <td><span class="pill">${escapeHtml(b.id || "")}</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
+  const sum = document.querySelector("#businessesSummary");
+  if (sum) sum.textContent = `${(businessesCache || []).length} business${(businessesCache || []).length === 1 ? "" : "es"}`;
+
+  const pick = document.querySelector("#businessPick");
+  if (pick) {
+    const keep = pick.value;
+    pick.innerHTML = `<option value="">Select business</option>`;
+    for (const b of businessesCache || []) {
+      const opt = document.createElement("option");
+      opt.value = b.id;
+      opt.textContent = b.name || b.id;
+      pick.appendChild(opt);
+    }
+    pick.value = keep;
+  }
 }
 
 function normalizeBroker(b) {
@@ -1808,7 +1967,7 @@ async function createUserFromForm(e) {
     toast("Please fill all user fields.");
     return;
   }
-  if (!ROLE_PERMS[role]) {
+  if (!ROLE_PERMS[role] && role !== "superadmin") {
     toast("Invalid role.");
     return;
   }
@@ -1831,6 +1990,7 @@ async function createUserFromForm(e) {
         role,
         password,
         permissions: ROLE_PERMS[role] ?? [],
+        businessId: getActiveBusinessId(),
       }),
     });
     if (!ok || !body || !body.ok) {
@@ -2003,6 +2163,7 @@ function canOpenNav(tab) {
   if (tab === "reports") return can(PERMS.REPORTS_VIEW);
   if (tab === "soldVehicleReports") return can(PERMS.REPORTS_VIEW);
   if (tab === "users") return can(PERMS.USERS_MANAGE);
+  if (tab === "businesses") return isSuperAdmin();
   if (tab === "garage" || tab === "customer") return canAccessGarageCustomer();
   // For now these are admin-only modules
   if (tab === "brokers") return isAdmin();
@@ -4523,6 +4684,10 @@ function initEvents() {
     $("#userSearch").addEventListener("input", renderUsers);
   }
 
+  // businesses (super admin)
+  document.querySelector("#businessForm")?.addEventListener("submit", createBusinessFromForm);
+  document.querySelector("#businessAdminForm")?.addEventListener("submit", createBusinessAdminFromForm);
+
   // brokers
   if (document.querySelector("#brokerForm")) {
     $("#brokerForm").addEventListener("submit", upsertBrokerFromForm);
@@ -4830,6 +4995,7 @@ function renderAll() {
   renderLedger();
   renderReports();
   renderUsers();
+  renderBusinessesUi();
   renderBrokers();
   renderSuppliers();
   renderPurchases();
@@ -4856,6 +5022,7 @@ async function bootstrap() {
 
   initNav();
   initEvents();
+  await refreshBusinessesFromServer();
   resetVehicleForm();
   updateLeaseSectionVisibility();
   const qDate = document.querySelector("#quotationDate");
