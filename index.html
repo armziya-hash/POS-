@@ -17,6 +17,15 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body class="app">
+    <datalist id="ownerTypeSuggestions">
+      <option value="Individual (private)"></option>
+      <option value="Company / Corporate"></option>
+      <option value="Leased / Finance company"></option>
+      <option value="Dealer / Trade stock"></option>
+      <option value="Government"></option>
+      <option value="Other"></option>
+    </datalist>
+
     <header class="topbar">
       <div class="brand">
         <div class="brand__logo" id="appLogoMark" aria-hidden="true">EI</div>
@@ -26,47 +35,46 @@
         </div>
       </div>
 
-      <div class="topbar__right">
-        <div class="userPill" id="userPill" hidden>
-          <span class="userPill__name" id="userNameLabel">—</span>
-          <span class="userPill__role" id="userRoleLabel">—</span>
-        </div>
-        <button class="btn btn--ghost" id="btnLogout" hidden>Logout</button>
-      </div>
-
       <nav class="mainNav" aria-label="Main navigation">
-        <button class="navItem navItem--home is-active" type="button" data-nav="home">Home</button>
+        <button class="navItem navItem--home is-active" type="button" data-nav="home">
+          <svg class="navItem__icon" aria-hidden="true"><use href="#i-home" /></svg>
+          Home
+        </button>
 
         <details class="menu" id="mainMenu">
-          <summary class="navItem navItem--menu">Main Menu</summary>
+          <summary class="navItem navItem--menu">
+            <svg class="navItem__icon" aria-hidden="true"><use href="#i-menu" /></svg>
+            Main Menu
+          </summary>
           <div class="menu__panel" role="menu" aria-label="Main menu items">
-            <button class="menu__item" type="button" data-nav="inventory">Inventory</button>
-            <button class="menu__item" type="button" data-nav="billing">Billing</button>
-            <button class="menu__item" type="button" data-nav="quotation">Quotation</button>
-            <button class="menu__item" type="button" data-nav="ledger">Ledger</button>
+            <button class="menu__item" type="button" data-nav="inventory"><svg class="menu__icon" aria-hidden="true"><use href="#i-inventory" /></svg>Inventory</button>
+            <button class="menu__item" type="button" data-nav="purchase"><svg class="menu__icon" aria-hidden="true"><use href="#i-purchase" /></svg>Purchase</button>
+            <button class="menu__item" type="button" data-nav="billing"><svg class="menu__icon" aria-hidden="true"><use href="#i-billing" /></svg>Billing</button>
+            <button class="menu__item" type="button" data-nav="ledger"><svg class="menu__icon" aria-hidden="true"><use href="#i-ledger" /></svg>Ledger</button>
+            <button class="menu__item" type="button" data-nav="soldVehicleReports"><svg class="menu__icon" aria-hidden="true"><use href="#i-car" /></svg>Sold Vehicle</button>
+            <button class="menu__item" type="button" data-nav="refusedVehicles"><svg class="menu__icon" aria-hidden="true"><use href="#i-block" /></svg>Refuse vehicle</button>
+
             <details class="reportsSubMenu" id="reportsSubMenu">
-              <summary class="menu__item" role="button" aria-label="Reports menu">Reports</summary>
+              <summary class="menu__item" role="button" aria-label="Reports menu"><svg class="menu__icon" aria-hidden="true"><use href="#i-reports" /></svg>Reports</summary>
               <div class="menu__panel menu__panel--sub" role="menu" aria-label="Reports submenu">
-                <button class="menu__item" type="button" data-nav="inventoryReports">Inventory Reports</button>
-                <button class="menu__item" type="button" data-nav="reports">Sales Reports</button>
-                <button class="menu__item" type="button" data-nav="soldVehicleReports">Sold Vehicle Reports</button>
+                <button class="menu__item" type="button" data-nav="inventoryReports"><svg class="menu__icon" aria-hidden="true"><use href="#i-inventory" /></svg>Inventory Reports</button>
+                <button class="menu__item" type="button" data-nav="reports"><svg class="menu__icon" aria-hidden="true"><use href="#i-report-sales" /></svg>Sales Reports</button>
+                <button class="menu__item" type="button" data-nav="dailyReport"><svg class="menu__icon" aria-hidden="true"><use href="#i-calendar" /></svg>Daily Report</button>
               </div>
             </details>
-            <button class="menu__item" type="button" data-nav="garage">Garage</button>
-            <button class="menu__item" type="button" data-nav="customer">Customer</button>
-            <div class="menu__sep"></div>
-            <button class="menu__item" type="button" data-nav="brokers">Brokers</button>
-            <button class="menu__item" type="button" data-nav="purchase">Purchase</button>
-            <button class="menu__item" type="button" data-nav="suppliers">Supplier</button>
-            <div class="menu__sep"></div>
-            <button class="menu__item" type="button" data-nav="users">Users</button>
-            <button class="menu__item" type="button" data-nav="businesses">Businesses</button>
+            <button class="menu__item" type="button" data-nav="garage"><svg class="menu__icon" aria-hidden="true"><use href="#i-garage" /></svg>Garage</button>
+            <button class="menu__item" type="button" data-nav="quotation"><svg class="menu__icon" aria-hidden="true"><use href="#i-quotation" /></svg>Quotation</button>
+            <button class="menu__item" type="button" data-nav="customer"><svg class="menu__icon" aria-hidden="true"><use href="#i-customer" /></svg>Customer</button>
+            <button class="menu__item" type="button" data-nav="suppliers"><svg class="menu__icon" aria-hidden="true"><use href="#i-supplier" /></svg>Supplier</button>
+            <button class="menu__item" type="button" data-nav="brokers"><svg class="menu__icon" aria-hidden="true"><use href="#i-broker" /></svg>Broker</button>
+            <button class="menu__item" type="button" data-nav="companyInfo"><svg class="menu__icon" aria-hidden="true"><use href="#i-company" /></svg>Company information</button>
+            <button class="menu__item" type="button" data-nav="users"><svg class="menu__icon" aria-hidden="true"><use href="#i-users" /></svg>Users</button>
             <div class="menu__sep"></div>
             <div class="menu__account">
               <div class="menu__accountHeading">Account</div>
               <div class="menu__accountInfo" id="menuAccountInfo"></div>
-              <button class="menu__item menu__item--account" type="button" id="btnMenuLogin">Log in</button>
-              <button class="menu__item menu__item--account" type="button" id="btnMenuLogout" hidden>Log out</button>
+              <button class="menu__item menu__item--account" type="button" id="btnMenuLogin"><svg class="menu__icon" aria-hidden="true"><use href="#i-login" /></svg>Log in</button>
+              <button class="menu__item menu__item--account" type="button" id="btnMenuLogout" hidden><svg class="menu__icon" aria-hidden="true"><use href="#i-logout" /></svg>Log out</button>
             </div>
           </div>
         </details>
@@ -80,35 +88,49 @@
             <div class="homeHero__card">
               <div class="homeHero__eyebrow">Welcome</div>
               <div class="homeHero__title" id="homeTitle">Operations dashboard</div>
-              <div class="homeHero__subtitle muted">
-                Manage stock, process sales, track the ledger, and run reports — with role-based access for your team.
-              </div>
+              <div class="homeHero__subtitle muted" hidden></div>
               <div class="homeQuickNav" aria-label="Dashboard quick navigation">
-                <button class="btn btn--primary homeQuickNav__btn" id="btnGoInventory" type="button">Inventory</button>
-                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeBilling" type="button">Billing</button>
-                <button class="btn btn--primary homeQuickNav__btn" id="btnHomePurchase" type="button">Purchase</button>
-                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeSupplier" type="button">Supplier</button>
-                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeCustomer" type="button">Customer</button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnGoInventory" type="button">
+                  <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-inventory" /></svg>
+                  Inventory
+                </button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeBilling" type="button">
+                  <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-billing" /></svg>
+                  Billing
+                </button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomePurchase" type="button">
+                  <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-purchase" /></svg>
+                  Purchase
+                </button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeSupplier" type="button">
+                  <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-supplier" /></svg>
+                  Supplier
+                </button>
+                <button class="btn btn--primary homeQuickNav__btn" id="btnHomeCustomer" type="button">
+                  <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-customer" /></svg>
+                  Customer
+                </button>
               </div>
               <div class="card homeHero__quickSearchCard">
                 <div class="card__header">
                   <h3>Quick Vehicle Search</h3>
                 </div>
-                <div class="row homeHero__quickSearchRow">
+                <div class="homeSearchPill" role="search">
                   <input
                     id="homeVehicleSearch"
-                    class="input"
+                    class="homeSearchPill__input"
                     type="search"
-                    placeholder="Search by Stock No or Vehicle Number"
+                    placeholder="Search"
+                    aria-label="Search by Stock No or Vehicle Number"
                   />
-                  <button class="btn btn--primary" id="btnHomeVehicleSearch" type="button">Search</button>
+                  <button class="homeSearchPill__btn" id="btnHomeVehicleSearch" type="button" aria-label="Search">
+                    <svg class="homeSearchPill__icon" aria-hidden="true"><use href="#i-search" /></svg>
+                  </button>
                 </div>
-                <div class="card__footer muted homeHero__quickSearchFooter"></div>
+                <div class="card__footer muted homeHero__quickSearchFooter" id="homeVehicleSearchSummary" hidden></div>
               </div>
-              <div class="homeHero__hint muted">
-                Sign in to continue. Permissions are enforced by role (RBAC).
-              </div>
-              <div class="homeHero__hint muted" id="homeCopyright" style="margin-top:12px;"></div>
+              <div class="homeHero__hint muted" hidden></div>
+              <div class="homeHero__hint muted" id="homeCopyright" style="margin-top:12px; text-align:center;"></div>
             </div>
           </div>
         </div>
@@ -133,11 +155,7 @@
             <div class="card__header">
               <h3>Inventory List</h3>
               <div class="row">
-                <input id="inventorySearch" class="input" type="search" placeholder="Search stock / VIN / make / model" />
-                <select id="inventoryFilterStatus" class="input">
-                  <option value="all">All</option>
-                  <option value="available">Available</option>
-                </select>
+                <input id="inventorySearch" class="input" type="search" placeholder="Search by Stock No. or Vehicle Number" />
               </div>
             </div>
             <div class="card__footer" style="border-top:none;">
@@ -156,6 +174,7 @@
                     <th class="num">Year</th>
                     <th>Make</th>
                     <th>Model</th>
+                    <th>Vehicle No</th>
                     <th>Garage status</th>
                     <th class="num">Price</th>
                     <th>Docs</th>
@@ -176,9 +195,8 @@
             <p class="muted">Totals by vehicle type (stock on hand, cost, and selling price).</p>
           </div>
           <div class="panel__actions">
-            <button class="btn btn--primary" id="btnSaveInventoryReportSettings" type="button">Save Settings</button>
-            <button class="btn" id="btnDownloadInventoryReportsCsv" type="button">Download CSV</button>
-            <button class="btn btn--ghost" id="btnPrintInventoryReports" type="button">Print</button>
+            <button class="btn btn--table btn--table-export" id="btnDownloadInventoryReportsCsv" type="button">Download CSV</button>
+            <button class="btn btn--table btn--table-export" id="btnPrintInventoryReports" type="button">Print</button>
           </div>
         </div>
 
@@ -260,6 +278,46 @@
               </table>
             </div>
 
+            <div class="card" style="margin: 12px 14px 0; border-radius: 12px;">
+              <div class="card__header" style="padding: 12px 14px;">
+                <h3 style="margin:0; font-size: 14px;">Extra items</h3>
+                <span class="badge badge--soft" id="cartExtrasCount">0</span>
+              </div>
+              <div class="card__body" style="padding: 12px 14px;">
+                <div class="formGrid" style="padding:0;">
+                  <label class="field field--full">
+                    <span>Item name</span>
+                    <input id="cartExtraName" type="text" placeholder="e.g. Document fee" autocomplete="off" />
+                  </label>
+                  <label class="field">
+                    <span>Qty</span>
+                    <input id="cartExtraQty" type="number" inputmode="numeric" min="1" step="1" value="1" />
+                  </label>
+                  <label class="field">
+                    <span>Price</span>
+                    <input id="cartExtraPrice" type="number" inputmode="decimal" min="0" step="0.01" value="0" />
+                  </label>
+                </div>
+                <div class="row" style="justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+                  <button class="btn btn--table btn--table-primary" id="btnAddCartExtra" type="button">Add item</button>
+                </div>
+                <div class="tableWrap" style="margin-top: 10px;">
+                  <table class="table table--dense" id="cartExtrasTable">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th class="num">Qty</th>
+                        <th class="num">Price</th>
+                        <th class="num">Total</th>
+                        <th class="actions">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
             <div class="totals">
               <div class="totals__row">
                 <span>Subtotal</span>
@@ -282,31 +340,6 @@
             </div>
 
             <div class="formGrid">
-              <div class="field field--full">
-                <span>Company Information (Admin)</span>
-                <div class="row">
-                  <label class="btn btn--primary" for="invoiceLogoInput">Upload Logo</label>
-                  <input id="invoiceLogoInput" type="file" accept="image/*" hidden />
-                  <button class="btn btn--danger" type="button" id="btnClearInvoiceLogo">Remove Logo</button>
-                  <input id="companyName" type="text" placeholder="Company name" />
-                </div>
-              </div>
-              <label class="field field--full">
-                <span>Company Address</span>
-                <input id="companyAddress" type="text" placeholder="Address line" />
-              </label>
-              <label class="field">
-                <span>Company Phone</span>
-                <input id="companyPhone" type="tel" placeholder="Phone" />
-              </label>
-              <label class="field">
-                <span>Company Email</span>
-                <input id="companyEmail" type="email" placeholder="Email" />
-              </label>
-              <label class="field field--full">
-                <span>Company Website</span>
-                <input id="companyWebsite" type="url" placeholder="Website (optional)" />
-              </label>
               <label class="field field--full">
                 <span>Customer from list</span>
                 <select id="invoiceCustomerPick" class="input" title="Choose a saved customer; name and phone fill below">
@@ -327,6 +360,7 @@
                   <option value="Cash">Cash</option>
                   <option value="Bank">Bank</option>
                   <option value="Card">Card</option>
+                  <option value="E-Wallet">E-Wallet</option>
                   <option value="Mixed">Mixed</option>
                 </select>
               </label>
@@ -346,18 +380,31 @@
                 <span>Remarks</span>
                 <textarea id="invoiceRemarks" rows="3" placeholder="optional"></textarea>
               </label>
-              <label class="field field--full">
-                <span class="row" style="justify-content:space-between;">
-                  <span>Immediate After-Billing (Invoice SMS)</span>
-                  <input id="invoiceSentAuto" type="checkbox" />
-                </span>
-                <textarea
-                  id="invoiceSentTemplate"
-                  rows="3"
-                  readonly
-                  title="Template used for immediate invoice SMS"
-                >Hi {{Customer Name}}, your invoice {{Invoice Number}} for {{Amount}}. Thank you for your business! - {{Company Name}}</textarea>
-              </label>
+              <div class="field field--full">
+                <span>Documents (tick)</span>
+                <div class="formGrid" style="padding: 0; grid-template-columns: 1fr 1fr">
+                  <label class="field field--inline">
+                    <span>ORIGINAL CR</span>
+                    <input id="docOriginalCr" type="checkbox" />
+                  </label>
+                  <label class="field field--inline">
+                    <span>NO OBJECTION LETTER</span>
+                    <input id="docNoObjection" type="checkbox" />
+                  </label>
+                  <label class="field field--inline">
+                    <span>DELETION</span>
+                    <input id="docDeletion" type="checkbox" />
+                  </label>
+                  <label class="field field--inline">
+                    <span>REVENUE LICENCE</span>
+                    <input id="docRevenueLicence" type="checkbox" />
+                  </label>
+                </div>
+                <label class="field field--full" style="margin-top: 10px">
+                  <span>OTHERS</span>
+                  <input id="docOthers" type="text" placeholder="Type other documents (optional)" />
+                </label>
+              </div>
             </div>
 
             <div class="invoicePreview" id="invoicePreview">
@@ -429,6 +476,8 @@
                   <div class="invoiceLine">OTHERS: <span id="invDocOthers">—</span></div>
                 </div>
 
+                <div class="invoice__footer muted" id="invFooter">Thank you.</div>
+
                 <div class="invoiceTerms">
                   <div><strong>TERMS AND CONDITIONS</strong></div>
                   <div id="invTerms">
@@ -452,8 +501,6 @@
                     <div class="line">SIGNATURE</div>
                   </div>
                 </div>
-
-                <div class="invoice__footer muted" id="invFooter">Thank you.</div>
                 <div class="invoice__copyright muted" id="invCopyright"></div>
               </div>
             </div>
@@ -480,6 +527,10 @@
               <h3>Create Quotation</h3>
             </div>
             <div class="formGrid">
+              <label class="field">
+                <span>Quotation ref.</span>
+                <input id="quotationRefNo" type="text" placeholder="Auto when printing / saving" />
+              </label>
               <label class="field">
                 <span>Date</span>
                 <input id="quotationDate" type="date" />
@@ -522,9 +573,26 @@
           <div class="card">
             <div class="card__header">
               <h3>Quotation Preview</h3>
+              <p class="muted">Matches print layout: letterhead, vehicle table, amount in words, signatures.</p>
             </div>
-            <div id="quotationPreview" class="muted">Select customer and vehicle to generate quotation preview.</div>
+            <div id="quotationPreview" class="muted">Select a vehicle to preview the formal quotation layout.</div>
           </div>
+        </div>
+
+        <div class="card" style="margin-top: 14px">
+          <div class="card__header">
+            <h3>Terms &amp; conditions</h3>
+            <div class="panel__actions" style="margin: 0">
+              <button class="btn btn--ghost" type="button" id="btnQuotationTermsDefault">Save as default</button>
+            </div>
+          </div>
+          <p class="muted" style="margin: 0 0 10px">
+            Edit for this quotation. <strong>Save as default</strong> stores the text for future quotes (also saved on each saved quotation).
+          </p>
+          <label class="field field--full">
+            <span>Terms (print &amp; PDF)</span>
+            <textarea id="quotationTerms" class="input" rows="10" placeholder="Terms and conditions…"></textarea>
+          </label>
         </div>
 
         <div class="card" style="margin-top:14px;">
@@ -535,7 +603,7 @@
             <table class="table" id="quotationTable">
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>Ref / Date</th>
                   <th>Customer</th>
                   <th>Vehicle</th>
                   <th>Valid Until</th>
@@ -554,16 +622,73 @@
         <div class="panel__header">
           <div>
             <h2>Ledger</h2>
-            <p class="muted">Record income/expense entries. Sales auto-create income entries.</p>
+            <p class="muted">
+              Full transaction log: sales (with tender &amp; COGS), cash/bank, tax notes, purchases, write-offs, and operating costs.
+              Sales post <strong>revenue</strong> + <strong>COGS</strong> automatically; voids remove both.
+            </p>
           </div>
           <div class="panel__actions">
+            <button class="btn" type="button" id="btnExportLedgerCsv" title="Export filtered entries">Export CSV</button>
             <button class="btn btn--primary" type="button" id="btnAddNewLedgerEntry" title="Open add-ledger-entry window">
-              + Add new Ledger Entry
+              + Add Ledger Entry
             </button>
           </div>
         </div>
 
-        <div class="grid grid--2">
+        <datalist id="ledgerCategoryList">
+          <option value="Vehicle Sale"></option>
+          <option value="Bank deposit"></option>
+          <option value="Customer payment (credit)"></option>
+          <option value="Return / refund offset"></option>
+          <option value="Other income"></option>
+          <option value="Cost of Goods Sold (COGS)"></option>
+          <option value="Vehicle purchase (supplier)"></option>
+          <option value="Operating expense"></option>
+          <option value="Rent / utilities"></option>
+          <option value="Wages / staff"></option>
+          <option value="Bank fees"></option>
+          <option value="Tax payment (GST/VAT)"></option>
+          <option value="Output tax accrued (sales)"></option>
+          <option value="Input tax (purchases)"></option>
+          <option value="Sundry debtor adjustment"></option>
+          <option value="Sundry creditor adjustment"></option>
+          <option value="Cash drawer — opening float"></option>
+          <option value="Cash drawer — add cash"></option>
+          <option value="Cash drawer — closing count"></option>
+          <option value="Cash discrepancy (short)"></option>
+          <option value="Cash discrepancy (over)"></option>
+          <option value="Inventory write-off / damage"></option>
+          <option value="Return / refund to customer"></option>
+          <option value="Other expense"></option>
+        </datalist>
+
+        <div class="card" style="margin-bottom: 14px">
+          <div class="card__header">
+            <h3>Range summary (Z-style)</h3>
+            <p class="muted">Uses the date range below + sales in that range for tender totals.</p>
+          </div>
+          <div class="kpis" id="ledgerZSummary" style="padding: 12px 14px 4px">
+            <div class="kpi">
+              <div class="muted">Ledger income</div>
+              <div class="kpi__value" id="ledgerSumIncome">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Ledger expenses</div>
+              <div class="kpi__value" id="ledgerSumExpense">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Net (ledger)</div>
+              <div class="kpi__value" id="ledgerSumNet">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Sales count (range)</div>
+              <div class="kpi__value" id="ledgerSumSaleCount">0</div>
+            </div>
+          </div>
+          <div class="card__footer muted" id="ledgerZSummaryTender" style="white-space: pre-wrap; font-size: 13px"></div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1fr;">
           <form id="ledgerForm" class="card">
             <div class="card__header">
               <h3>Add Ledger Entry</h3>
@@ -580,19 +705,48 @@
               </label>
               <label class="field">
                 <span>Category</span>
-                <input id="ledgerCategory" type="text" placeholder="e.g. Transport / Office / Bank" required />
+                <input id="ledgerCategory" type="text" list="ledgerCategoryList" placeholder="Pick or type" required />
               </label>
               <label class="field">
-                <span>Amount</span>
+                <span>Amount (LKR)</span>
                 <input id="ledgerAmount" type="number" inputmode="decimal" min="0" step="0.01" required />
               </label>
               <label class="field">
-                <span>Date</span>
+                <span>Entry date</span>
                 <input id="ledgerDate" type="date" />
               </label>
+              <label class="field">
+                <span>Reference / TXN ID</span>
+                <input id="ledgerTxnRef" type="text" placeholder="e.g. DEP-001, CHQ-4421" />
+              </label>
+              <label class="field">
+                <span>Payment method</span>
+                <select id="ledgerPaymentMethod">
+                  <option value="">—</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank">Bank transfer</option>
+                  <option value="Card">Card</option>
+                  <option value="E-Wallet">E-Wallet</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Credit">Credit / on account</option>
+                  <option value="Mixed">Mixed</option>
+                </select>
+              </label>
               <label class="field field--full">
-                <span>Details</span>
-                <textarea id="ledgerDetails" rows="3" placeholder="optional"></textarea>
+                <span>Counterparty (customer / supplier / bank)</span>
+                <input id="ledgerCounterparty" type="text" placeholder="Who paid or was paid" />
+              </label>
+              <label class="field">
+                <span>Discount (LKR)</span>
+                <input id="ledgerDiscountAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="field">
+                <span>Tax (GST/VAT) (LKR)</span>
+                <input id="ledgerTaxAmount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="field field--full">
+                <span>Details / line notes</span>
+                <textarea id="ledgerDetails" rows="3" placeholder="SKU/stock lines, memo, cheque no., etc."></textarea>
               </label>
             </div>
 
@@ -604,24 +758,41 @@
 
           <div class="card">
             <div class="card__header">
-              <h3>Ledger Entries</h3>
-              <div class="row">
-                <input id="ledgerSearch" class="input" type="search" placeholder="Search category/details" />
+              <h3>Ledger entries</h3>
+              <div class="row" style="flex-wrap: wrap; gap: 8px">
+                <label class="field field--inline" style="margin: 0">
+                  <span>From</span>
+                  <input id="ledgerFilterFrom" class="input" type="date" />
+                </label>
+                <label class="field field--inline" style="margin: 0">
+                  <span>To</span>
+                  <input id="ledgerFilterTo" class="input" type="date" />
+                </label>
+                <button type="button" class="btn btn--ghost" id="btnLedgerRangeToday">Today</button>
+                <button type="button" class="btn btn--ghost" id="btnLedgerRangeMonth">This month</button>
+                <button type="button" class="btn btn--ghost" id="btnLedgerRangeClear">All dates</button>
+              </div>
+              <div class="row" style="margin-top: 10px">
+                <input id="ledgerSearch" class="input" type="search" placeholder="Search ref, category, party, details…" />
                 <select id="ledgerFilterType" class="input">
-                  <option value="all">All</option>
+                  <option value="all">All types</option>
                   <option value="income">Income</option>
                   <option value="expense">Expense</option>
                 </select>
               </div>
             </div>
-            <div class="tableWrap">
+            <div class="tableWrap" style="overflow-x: auto">
               <table class="table" id="ledgerTable">
                 <thead>
                   <tr>
-                    <th>Date</th>
+                    <th>Date / time</th>
+                    <th>Ref</th>
                     <th>Type</th>
                     <th>Category</th>
-                    <th>Details</th>
+                    <th>Pay</th>
+                    <th>Counterparty</th>
+                    <th>Details / lines</th>
+                    <th class="num">Adj.</th>
                     <th class="num">Amount</th>
                     <th class="actions">Actions</th>
                   </tr>
@@ -702,10 +873,220 @@
         </div>
       </section>
 
+      <section class="panel" id="panel-daily-report" data-panel="dailyReport" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Daily Report</h2>
+            <p class="muted">
+              End-of-day POS summary: sales, payments, vehicles, optional till count, and staff attribution (new sales only).
+            </p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" id="btnDailyReportPrint" type="button">Print / PDF</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Report range</h3>
+            <div class="row">
+              <label class="field field--inline">
+                <span>From</span>
+                <input id="dailyReportFrom" type="date" />
+              </label>
+              <label class="field field--inline">
+                <span>To</span>
+                <input id="dailyReportTo" type="date" />
+              </label>
+              <button class="btn btn--ghost" id="btnDailyReportRefresh" type="button">Refresh</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Financial summary</h3>
+            <p class="muted">Tax is not tracked on invoices in this app — shown as 0.</p>
+          </div>
+          <div class="kpis" id="dailyReportKpisFin">
+            <div class="kpi">
+              <div class="muted">Gross sales</div>
+              <div class="kpi__value" id="drFinGross">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Discounts</div>
+              <div class="kpi__value" id="drFinDiscount">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Net sales</div>
+              <div class="kpi__value" id="drFinNet">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Tax collected</div>
+              <div class="kpi__value" id="drFinTax">—</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Total revenue (net)</div>
+              <div class="kpi__value" id="drFinRevenue">0.00</div>
+            </div>
+          </div>
+          <div class="tableWrap" style="margin-top: 14px">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Payment method</th>
+                  <th class="num">Transactions</th>
+                  <th class="num">Net total</th>
+                </tr>
+              </thead>
+              <tbody id="drPayTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Transactions</h3>
+          </div>
+          <div class="kpis">
+            <div class="kpi">
+              <div class="muted">Count</div>
+              <div class="kpi__value" id="drTxnCount">0</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Avg. transaction (net)</div>
+              <div class="kpi__value" id="drTxnAvg">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Partial payments</div>
+              <div class="kpi__value" id="drTxnPartial">0</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Voids / refunds</div>
+              <div class="kpi__value" id="drTxnVoid" style="font-size: 14px; line-height: 1.3">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Sales performance (vehicles)</h3>
+            <p class="muted">Top units by net line total; mix by vehicle type from inventory.</p>
+          </div>
+          <div class="row" style="flex-wrap: wrap; gap: 16px; align-items: flex-start">
+            <div style="flex: 1; min-width: 280px">
+              <h4 class="muted" style="margin: 0 0 8px; font-size: 13px; font-weight: 600">Top-selling vehicles</h4>
+              <div class="tableWrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Stock / vehicle</th>
+                      <th class="num">Qty</th>
+                      <th class="num">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody id="drTopTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div style="flex: 1; min-width: 280px">
+              <h4 class="muted" style="margin: 0 0 8px; font-size: 13px; font-weight: 600">Mix by type</h4>
+              <div class="tableWrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Vehicle type</th>
+                      <th class="num">Units sold</th>
+                      <th class="num">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody id="drMixTbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="kpis" style="margin-top: 14px">
+            <div class="kpi">
+              <div class="muted">Gross profit (est.)</div>
+              <div class="kpi__value" id="drGpTotal">0.00</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Margin on COGS</div>
+              <div class="kpi__value" id="drGpMargin">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>End of session / till</h3>
+            <p class="muted">Expected cash = sum of <strong>Cash</strong> sales (paid amount, capped at invoice total) for the selected range.</p>
+          </div>
+          <div class="row" style="flex-wrap: wrap; gap: 14px; align-items: flex-end">
+            <label class="field">
+              <span>Expected cash</span>
+              <input id="drTillExpected" class="input" type="text" readonly />
+            </label>
+            <label class="field">
+              <span>Cash counted</span>
+              <input id="drTillCashCounted" class="input" type="number" min="0" step="0.01" placeholder="Enter counted cash" />
+            </label>
+            <label class="field">
+              <span>Variance</span>
+              <input id="drTillVariance" class="input" type="text" readonly />
+            </label>
+            <button class="btn btn--primary" type="button" id="btnDailyReportSaveTill">Save till notes</button>
+          </div>
+          <label class="field field--full" style="margin-top: 12px">
+            <span>Deposit / notes</span>
+            <textarea id="drTillDepositNote" class="input" rows="2" placeholder="Bank deposit ref, safe drop, remarks…"></textarea>
+          </label>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Employee activity</h3>
+            <p class="muted">Sales per user (logged-in user at checkout). Hours / clock-in are not tracked in this app.</p>
+          </div>
+          <div class="tableWrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th class="num">Sales</th>
+                  <th class="num">Net total</th>
+                </tr>
+              </thead>
+              <tbody id="drEmpTbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__header">
+            <h3>Inventory status</h3>
+            <p class="muted">Stock is tracked per vehicle (not SKU quantities). Low-stock thresholds use Inventory Reports by type.</p>
+          </div>
+          <div class="kpis">
+            <div class="kpi">
+              <div class="muted">Vehicles sold (range)</div>
+              <div class="kpi__value" id="drInvSold">0</div>
+            </div>
+            <div class="kpi">
+              <div class="muted">Available for sale</div>
+              <div class="kpi__value" id="drInvAvail">0</div>
+            </div>
+          </div>
+          <p class="muted" id="drInvLowNote" style="margin-top: 12px"></p>
+        </div>
+
+        <div id="dailyReportPrintRoot" hidden aria-hidden="true"></div>
+      </section>
+
       <section class="panel" id="panel-sold-vehicle-reports" data-panel="soldVehicleReports" role="tabpanel">
         <div class="panel__header">
           <div>
-            <h2>Sold Vehicle Reports</h2>
+            <h2>Sold Vehicles</h2>
             <p class="muted">List of all sold vehicles with invoice and customer details.</p>
           </div>
         </div>
@@ -743,51 +1124,63 @@
         </div>
       </section>
 
+      <section class="panel" id="panel-refused-vehicles" data-panel="refusedVehicles" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Refuse vehicle</h2>
+            <p class="muted">Record vehicles that were rejected (for follow-up and history).</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" id="btnOpenRefusedVehicleFormDialog" type="button" title="Add refused vehicle">+ Add refused vehicle</button>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1fr;">
+          <div class="card">
+            <div class="card__header">
+              <h3>Refused vehicles</h3>
+              <div class="row">
+                <input id="refusedVehicleSearch" class="input" type="search" placeholder="Search by Vehicle number or Chassis number" />
+              </div>
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="refusedVehiclesTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Vehicle number</th>
+                    <th>Make</th>
+                    <th>Model</th>
+                    <th class="num">Year</th>
+                    <th>Chassis</th>
+                    <th>Broker</th>
+                    <th>Owner</th>
+                    <th>Location</th>
+                    <th>Docs</th>
+                    <th>Reason</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="refusedVehiclesSummary">0 refused vehicles</div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" id="panel-users" data-panel="users" role="tabpanel">
         <div class="panel__header">
           <div>
             <h2>Users</h2>
             <p class="muted">Admin-only. Create users and assign roles (RBAC).</p>
           </div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" id="btnOpenUserFormDialog" type="button">Create User</button>
+          </div>
         </div>
 
-        <div class="grid grid--2">
-          <form id="userForm" class="card">
-            <div class="card__header">
-              <h3>Create User</h3>
-              <span class="badge badge--soft">Admin</span>
-            </div>
-
-            <div class="formGrid">
-              <label class="field">
-                <span>Username</span>
-                <input id="newUsername" type="text" autocomplete="off" placeholder="e.g. cashier1" required />
-              </label>
-              <label class="field">
-                <span>Display Name</span>
-                <input id="newName" type="text" autocomplete="off" placeholder="e.g. Nimal" required />
-              </label>
-              <label class="field">
-                <span>Role</span>
-                <select id="newRole" required>
-                  <option value="cashier">cashier</option>
-                  <option value="supervisor">supervisor</option>
-                  <option value="manager">manager</option>
-                  <option value="admin">admin</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Temporary Password</span>
-                <input id="newPassword" type="password" autocomplete="new-password" required />
-              </label>
-            </div>
-
-            <div class="row row--between">
-              <button class="btn btn--primary" type="submit">Create</button>
-              <button class="btn btn--ghost" type="reset">Clear</button>
-            </div>
-          </form>
-
+        <div class="grid">
           <div class="card">
             <div class="card__header">
               <h3>User List</h3>
@@ -811,6 +1204,107 @@
               </table>
             </div>
             <div class="card__footer muted" id="usersSummary">0 users</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-company-info" data-panel="companyInfo" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Company Information</h2>
+            <p class="muted">Admin only. This information is used on invoices, quotations, and the app header.</p>
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <div class="card__header">
+              <h3>Company details</h3>
+              <span class="badge">Branding</span>
+            </div>
+            <div class="formGrid">
+              <div class="field field--full">
+                <span>Logo</span>
+                <div class="row">
+                  <label class="btn btn--primary" for="invoiceLogoInput">Upload Logo</label>
+                  <input id="invoiceLogoInput" type="file" accept="image/*" hidden />
+                  <button class="btn btn--danger" type="button" id="btnClearInvoiceLogo">Remove Logo</button>
+                </div>
+              </div>
+              <label class="field field--full">
+                <span>Company name</span>
+                <input id="companyName" type="text" placeholder="Company name" />
+              </label>
+              <label class="field field--full">
+                <span>Company address</span>
+                <input id="companyAddress" type="text" placeholder="Address line" />
+              </label>
+              <label class="field">
+                <span>Company phone</span>
+                <input id="companyPhone" type="tel" placeholder="Phone" />
+              </label>
+              <label class="field">
+                <span>Company email</span>
+                <input id="companyEmail" type="email" placeholder="Email" />
+              </label>
+              <label class="field field--full">
+                <span>Company website</span>
+                <input id="companyWebsite" type="url" placeholder="Website (optional)" />
+              </label>
+
+              <label class="field field--full">
+                <span class="row" style="justify-content:space-between;">
+                  <span>Immediate After-Billing (Invoice SMS)</span>
+                  <input id="invoiceSentAuto" type="checkbox" />
+                </span>
+                <textarea
+                  id="invoiceSentTemplate"
+                  rows="4"
+                  placeholder="Type SMS template..."
+                  title="Supports: {{Customer Name}}, {{Invoice Number}}, {{Amount}}, {{Company Name}}"
+                ></textarea>
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>Where this shows</h3>
+              <span class="badge badge--soft">Info</span>
+            </div>
+            <div class="muted">
+              - Invoice preview header<br />
+              - Quotation document header<br />
+              - App top bar branding
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h3>Developer (Copyright)</h3>
+              <span class="badge badge--soft">Footer</span>
+            </div>
+            <div class="formGrid">
+              <label class="field field--full">
+                <span>Developer company name</span>
+                <input id="devCompanyName" type="text" placeholder="e.g. ABC Software" />
+              </label>
+              <label class="field">
+                <span>Developer phone</span>
+                <input id="devCompanyPhone" type="tel" placeholder="Phone" />
+              </label>
+              <label class="field">
+                <span>Developer email</span>
+                <input id="devCompanyEmail" type="email" placeholder="Email" />
+              </label>
+              <label class="field field--full">
+                <span>Developer website</span>
+                <input id="devCompanyWebsite" type="url" placeholder="Website (optional)" />
+              </label>
+              <div class="muted" style="margin-top: 6px">
+                These details show in the app copyright (Home + Login screens).
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -904,7 +1398,7 @@
             </button>
           </div>
         </div>
-        <div class="grid grid--2">
+        <div class="grid" style="grid-template-columns: 1fr;">
           <form id="brokerForm" class="card" hidden>
             <div class="card__header">
               <h3>Add Broker</h3>
@@ -913,9 +1407,22 @@
             <input type="hidden" id="brokerId" />
             <div class="formGrid">
               <label class="field"><span>Name</span><input id="brokerName" type="text" required /></label>
+              <label class="field"><span>Broker ID Number</span><input id="brokerIdNumber" type="text" placeholder="NIC / Passport / ID" autocomplete="off" /></label>
               <label class="field"><span>Phone</span><input id="brokerPhone" type="tel" /></label>
               <label class="field"><span>Email</span><input id="brokerEmail" type="email" /></label>
               <label class="field field--full"><span>Address</span><input id="brokerAddress" type="text" /></label>
+              <div class="field field--full">
+                <span>Broker photo</span>
+                <div class="row" style="flex-wrap: wrap">
+                  <label class="btn btn--primary" for="brokerPhotoInput">Attach Photo</label>
+                  <input id="brokerPhotoInput" type="file" accept="image/*" hidden />
+                  <button class="btn" type="button" id="btnBrokerOpenWebcam">Use Webcam</button>
+                  <button class="btn btn--danger" type="button" id="btnClearBrokerPhoto">Remove Photo</button>
+                </div>
+                <div class="imgPreviewWrap" id="brokerPhotoPreviewWrap" hidden>
+                  <img id="brokerPhotoPreview" alt="Broker" />
+                </div>
+              </div>
               <label class="field field--full"><span>Notes</span><textarea id="brokerNotes" rows="3"></textarea></label>
             </div>
             <div class="row row--between">
@@ -934,7 +1441,7 @@
             <div class="tableWrap">
               <table class="table" id="brokersTable">
                 <thead>
-                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
+                  <tr><th>Photo</th><th>Name</th><th>Broker ID</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
                 </thead>
                 <tbody></tbody>
               </table>
@@ -954,9 +1461,10 @@
             <button class="btn btn--primary" type="button" id="btnAddNewSupplier" title="Open add-supplier window">
               + Add new Supplier
             </button>
+            <button class="btn" type="button" id="btnExportSuppliersCsv">Download Suppliers</button>
           </div>
         </div>
-        <div class="grid grid--2">
+        <div class="grid" style="grid-template-columns: 1fr;">
           <form id="supplierForm" class="card" hidden>
             <div class="card__header">
               <h3>Add Supplier</h3>
@@ -964,10 +1472,59 @@
             </div>
             <input type="hidden" id="supplierId" />
             <div class="formGrid">
-              <label class="field"><span>Name</span><input id="supplierName" type="text" required /></label>
+              <label class="field"><span>First name</span><input id="supplierFirstName" type="text" autocomplete="given-name" required /></label>
+              <label class="field"><span>Second name</span><input id="supplierSecondName" type="text" autocomplete="family-name" /></label>
+              <label class="field"><span>Supplier ID Number</span><input id="supplierIdNumber" type="text" placeholder="NIC / Passport / ID" autocomplete="off" /></label>
               <label class="field"><span>Phone</span><input id="supplierPhone" type="tel" /></label>
               <label class="field"><span>Email</span><input id="supplierEmail" type="email" /></label>
               <label class="field field--full"><span>Address</span><input id="supplierAddress" type="text" /></label>
+              <div class="field field--full">
+                <span>Supplier photo</span>
+                <div class="row" style="flex-wrap: wrap">
+                  <label class="btn btn--primary" for="supplierPhotoInput">Attach Photo</label>
+                  <input id="supplierPhotoInput" type="file" accept="image/*" hidden />
+                  <button class="btn" type="button" id="btnSupplierOpenWebcam">Use Webcam</button>
+                  <button class="btn btn--danger" type="button" id="btnClearSupplierPhoto">Remove Photo</button>
+                </div>
+                <div class="imgPreviewWrap" id="supplierPhotoPreviewWrap" hidden>
+                  <img id="supplierPhotoPreview" alt="Supplier" />
+                </div>
+              </div>
+              <div class="field field--full">
+                <span>Supplier ID copy</span>
+                <div class="grid grid--2" style="margin-top: 8px">
+                  <div>
+                    <div class="muted" style="font-weight: 700; margin-bottom: 8px">Front page</div>
+                    <div class="row" style="flex-wrap: wrap">
+                      <label class="btn btn--primary" for="supplierIdFrontInput">Attach Front</label>
+                      <input id="supplierIdFrontInput" type="file" accept="image/*" hidden />
+                      <button class="btn btn--danger" type="button" id="btnClearSupplierIdFront">Remove</button>
+                    </div>
+                    <div class="imgPreviewWrap" id="supplierIdFrontPreviewWrap" hidden>
+                      <img id="supplierIdFrontPreview" alt="Supplier ID front" />
+                      <div class="row" style="justify-content: flex-end; margin-top: 10px; flex-wrap: wrap">
+                        <a class="btn btn--table" id="supplierIdFrontView" href="#" target="_blank" rel="noreferrer">View</a>
+                        <a class="btn btn--table btn--table-export" id="supplierIdFrontDownload" href="#" download="supplier-id-front.jpg">Download</a>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-weight: 700; margin-bottom: 8px">Back page</div>
+                    <div class="row" style="flex-wrap: wrap">
+                      <label class="btn btn--primary" for="supplierIdBackInput">Attach Back</label>
+                      <input id="supplierIdBackInput" type="file" accept="image/*" hidden />
+                      <button class="btn btn--danger" type="button" id="btnClearSupplierIdBack">Remove</button>
+                    </div>
+                    <div class="imgPreviewWrap" id="supplierIdBackPreviewWrap" hidden>
+                      <img id="supplierIdBackPreview" alt="Supplier ID back" />
+                      <div class="row" style="justify-content: flex-end; margin-top: 10px; flex-wrap: wrap">
+                        <a class="btn btn--table" id="supplierIdBackView" href="#" target="_blank" rel="noreferrer">View</a>
+                        <a class="btn btn--table btn--table-export" id="supplierIdBackDownload" href="#" download="supplier-id-back.jpg">Download</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <label class="field field--full"><span>Notes</span><textarea id="supplierNotes" rows="3"></textarea></label>
             </div>
             <div class="row row--between">
@@ -986,7 +1543,7 @@
             <div class="tableWrap">
               <table class="table" id="suppliersTable">
                 <thead>
-                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
+                  <tr><th>Photo</th><th>Name</th><th>Supplier ID</th><th>Phone</th><th>Email</th><th>Address</th><th>ID Copy</th><th class="actions">Actions</th></tr>
                 </thead>
                 <tbody></tbody>
               </table>
@@ -1023,6 +1580,7 @@
                     <th>Vehicle</th>
                     <th class="num">Cost</th>
                     <th class="num">Sell</th>
+                    <th class="actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -1076,9 +1634,10 @@
             <button class="btn btn--primary" type="button" id="btnAddNewCustomer" title="Open add-customer window">
               + Add new Customer
             </button>
+            <button class="btn" type="button" id="btnExportCustomersCsv">Download Customers</button>
           </div>
         </div>
-        <div class="grid grid--2">
+        <div class="grid" style="grid-template-columns: 1fr;">
           <form id="customerForm" class="card" hidden>
             <div class="card__header">
               <h3>Add customer</h3>
@@ -1086,10 +1645,59 @@
             </div>
             <input type="hidden" id="customerId" />
             <div class="formGrid">
-              <label class="field"><span>Name</span><input id="crmCustomerName" type="text" required /></label>
+              <label class="field"><span>First name</span><input id="customerFirstName" type="text" autocomplete="given-name" required /></label>
+              <label class="field"><span>Second name</span><input id="customerSecondName" type="text" autocomplete="family-name" /></label>
+              <label class="field"><span>Customer ID Number</span><input id="customerIdNumber" type="text" placeholder="NIC / Passport / ID" autocomplete="off" /></label>
               <label class="field"><span>Phone</span><input id="crmCustomerPhone" type="tel" /></label>
               <label class="field"><span>Email</span><input id="customerEmail" type="email" /></label>
               <label class="field field--full"><span>Address</span><input id="customerAddress" type="text" /></label>
+              <div class="field field--full">
+                <span>Customer photo</span>
+                <div class="row" style="flex-wrap: wrap">
+                  <label class="btn btn--primary" for="customerPhotoInput">Attach Photo</label>
+                  <input id="customerPhotoInput" type="file" accept="image/*" hidden />
+                  <button class="btn" type="button" id="btnCustomerOpenWebcam">Use Webcam</button>
+                  <button class="btn btn--danger" type="button" id="btnClearCustomerPhoto">Remove Photo</button>
+                </div>
+                <div class="imgPreviewWrap" id="customerPhotoPreviewWrap" hidden>
+                  <img id="customerPhotoPreview" alt="Customer" />
+                </div>
+              </div>
+              <div class="field field--full">
+                <span>Customer ID copy</span>
+                <div class="grid grid--2" style="margin-top: 8px">
+                  <div>
+                    <div class="muted" style="font-weight: 700; margin-bottom: 8px">Front page</div>
+                    <div class="row" style="flex-wrap: wrap">
+                      <label class="btn btn--primary" for="customerIdFrontInput">Attach Front</label>
+                      <input id="customerIdFrontInput" type="file" accept="image/*" hidden />
+                      <button class="btn btn--danger" type="button" id="btnClearCustomerIdFront">Remove</button>
+                    </div>
+                    <div class="imgPreviewWrap" id="customerIdFrontPreviewWrap" hidden>
+                      <img id="customerIdFrontPreview" alt="Customer ID front" />
+                      <div class="row" style="justify-content: flex-end; margin-top: 10px; flex-wrap: wrap">
+                        <a class="btn btn--table" id="customerIdFrontView" href="#" target="_blank" rel="noreferrer">View</a>
+                        <a class="btn btn--table btn--table-export" id="customerIdFrontDownload" href="#" download="customer-id-front.jpg">Download</a>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="muted" style="font-weight: 700; margin-bottom: 8px">Back page</div>
+                    <div class="row" style="flex-wrap: wrap">
+                      <label class="btn btn--primary" for="customerIdBackInput">Attach Back</label>
+                      <input id="customerIdBackInput" type="file" accept="image/*" hidden />
+                      <button class="btn btn--danger" type="button" id="btnClearCustomerIdBack">Remove</button>
+                    </div>
+                    <div class="imgPreviewWrap" id="customerIdBackPreviewWrap" hidden>
+                      <img id="customerIdBackPreview" alt="Customer ID back" />
+                      <div class="row" style="justify-content: flex-end; margin-top: 10px; flex-wrap: wrap">
+                        <a class="btn btn--table" id="customerIdBackView" href="#" target="_blank" rel="noreferrer">View</a>
+                        <a class="btn btn--table btn--table-export" id="customerIdBackDownload" href="#" download="customer-id-back.jpg">Download</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <label class="field field--full"><span>Notes</span><textarea id="customerNotes" rows="3"></textarea></label>
             </div>
             <div class="row row--between">
@@ -1108,7 +1716,16 @@
             <div class="tableWrap">
               <table class="table" id="customersTable">
                 <thead>
-                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th class="actions">Actions</th></tr>
+                  <tr>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>Customer ID</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                    <th>ID Copy</th>
+                    <th class="actions">Actions</th>
+                  </tr>
                 </thead>
                 <tbody></tbody>
               </table>
@@ -1130,6 +1747,60 @@
         </div>
         <div class="dialog__body dialog__body--vehicle">
           <div id="customerFormDialogBody"></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="customerWebcamDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0" id="customerWebcamTitle">Take customer photo</h3>
+          <button type="button" class="iconBtn" id="btnCloseCustomerWebcamDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div class="muted" style="margin-bottom: 10px">Allow camera access when prompted.</div>
+          <video id="customerWebcamVideo" autoplay playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--border); background: #000"></video>
+          <canvas id="customerWebcamCanvas" hidden></canvas>
+          <div class="row" style="justify-content: flex-end; margin-top: 12px; flex-wrap: wrap">
+            <button class="btn" type="button" id="btnCustomerStopWebcam">Stop</button>
+            <button class="btn btn--primary" type="button" id="btnCustomerCaptureWebcam">Capture</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="brokerWebcamDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Take broker photo</h3>
+          <button type="button" class="iconBtn" id="btnCloseBrokerWebcamDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div class="muted" style="margin-bottom: 10px">Allow camera access when prompted.</div>
+          <video id="brokerWebcamVideo" autoplay playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--border); background: #000"></video>
+          <canvas id="brokerWebcamCanvas" hidden></canvas>
+          <div class="row" style="justify-content: flex-end; margin-top: 12px; flex-wrap: wrap">
+            <button class="btn" type="button" id="btnBrokerStopWebcam">Stop</button>
+            <button class="btn btn--primary" type="button" id="btnBrokerCaptureWebcam">Capture</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="supplierWebcamDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Take supplier photo</h3>
+          <button type="button" class="iconBtn" id="btnCloseSupplierWebcamDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div class="muted" style="margin-bottom: 10px">Allow camera access when prompted.</div>
+          <video id="supplierWebcamVideo" autoplay playsinline style="width: 100%; border-radius: 12px; border: 1px solid var(--border); background: #000"></video>
+          <canvas id="supplierWebcamCanvas" hidden></canvas>
+          <div class="row" style="justify-content: flex-end; margin-top: 12px; flex-wrap: wrap">
+            <button class="btn" type="button" id="btnSupplierStopWebcam">Stop</button>
+            <button class="btn btn--primary" type="button" id="btnSupplierCaptureWebcam">Capture</button>
+          </div>
         </div>
       </div>
     </dialog>
@@ -1228,6 +1899,109 @@
       </div>
     </dialog>
 
+    <dialog class="dialog dialog--vehicle" id="refusedVehicleFormDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Refuse vehicle</h3>
+          <button type="button" class="iconBtn" id="btnCloseRefusedVehicleFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <form id="refusedVehicleForm" class="formGrid">
+            <input type="hidden" id="refusedVehicleId" />
+            <label class="field">
+              <span>Vehicle number</span>
+              <input id="refusedVehicleNumber" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Model</span>
+              <input id="refusedModel" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Make</span>
+              <input id="refusedMake" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Year</span>
+              <input id="refusedYear" type="number" inputmode="numeric" min="1900" max="2100" />
+            </label>
+            <label class="field">
+              <span>Chassis number</span>
+              <input id="refusedChassisNumber" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Broker</span>
+              <input id="refusedBroker" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Current owner</span>
+              <input id="refusedCurrentOwner" type="text" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Location</span>
+              <input id="refusedLocation" type="text" autocomplete="off" />
+            </label>
+            <label class="field field--full">
+              <span>Reason for rejection</span>
+              <textarea id="refusedReason" rows="3" placeholder="Type the reason..." style="resize: vertical;"></textarea>
+            </label>
+            <div class="field field--full">
+              <span>Documents</span>
+              <div class="row" style="flex-wrap: wrap">
+                <label class="btn btn--primary" for="refusedDocsInput">Attach Documents</label>
+                <input id="refusedDocsInput" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple hidden />
+              </div>
+              <div class="docsList" id="refusedDocsList" style="margin-top: 10px"></div>
+            </div>
+          </form>
+          <div class="row" style="justify-content:flex-end; margin-top: 14px; flex-wrap: wrap; gap: 8px;">
+            <button class="btn" type="button" id="btnClearRefusedVehicleForm">Clear</button>
+            <button class="btn btn--primary" type="submit" form="refusedVehicleForm" id="btnSaveRefusedVehicle">Save</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="userFormDialog">
+      <div class="dialog__card dialog__card--vehicle dialog__card--login" style="max-width: 520px;">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;">Create User</h3>
+            <span class="badge badge--soft">Admin</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseUserFormDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <form id="userForm" class="formGrid">
+            <label class="field">
+              <span>Username</span>
+              <input id="newUsername" type="text" autocomplete="off" placeholder="e.g. cashier1" required />
+            </label>
+            <label class="field">
+              <span>Display Name</span>
+              <input id="newName" type="text" autocomplete="off" placeholder="e.g. Nimal" required />
+            </label>
+            <label class="field">
+              <span>Role</span>
+              <select id="newRole" required>
+                <option value="cashier">cashier</option>
+                <option value="supervisor">supervisor</option>
+                <option value="manager">manager</option>
+                <option value="admin">admin</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Temporary Password</span>
+              <input id="newPassword" type="password" autocomplete="new-password" required />
+            </label>
+            <div class="row row--between" style="margin-top: 8px;">
+              <button class="btn btn--primary" type="submit">Create</button>
+              <button class="btn btn--ghost" type="reset">Clear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="dialog dialog--vehicle" id="purchaseFormDialog">
       <div class="dialog__card dialog__card--vehicle">
         <div class="dialog__header">
@@ -1255,6 +2029,30 @@
                 <span>Supplier / broker</span>
                 <select id="purchaseParty" required></select>
               </label>
+
+              <div class="field field--full" style="grid-column: 1 / -1">
+                <span class="muted" style="display: block; margin-bottom: 8px; font-weight: 600">Vehicle owner (optional)</span>
+                <div class="formGrid" style="padding: 0">
+                  <label class="field">
+                    <span>First name</span>
+                    <input id="purchaseOwnerFirstName" type="text" placeholder="e.g. Nimal" autocomplete="name" />
+                  </label>
+                  <label class="field">
+                    <span>Second name</span>
+                    <input id="purchaseOwnerSecondName" type="text" placeholder="e.g. Perera" autocomplete="off" />
+                  </label>
+                  <label class="field field--full" style="grid-column: 1 / -1">
+                    <span>Owner type</span>
+                    <input
+                      id="purchaseOwnerType"
+                      type="text"
+                      list="ownerTypeSuggestions"
+                      placeholder="Pick a suggestion or type your own"
+                      autocomplete="off"
+                    />
+                  </label>
+                </div>
+              </div>
 
               <label class="field">
                 <span>Stock No.</span>
@@ -1294,6 +2092,8 @@
                   <option value="Truck">Truck</option>
                   <option value="Pickup">Pickup</option>
                   <option value="Bike">Bike</option>
+                  <option value="Three wheeler">Three wheeler</option>
+                  <option value="Lorry">Lorry</option>
                 </select>
               </label>
               <label class="field">
@@ -1336,36 +2136,10 @@
                   <option value="Used">Used</option>
                 </select>
               </label>
-              <div class="field field--full" id="purchaseLeaseSection" hidden>
-                <span>Leasing details (used vehicles)</span>
-                <div class="formGrid" style="padding: 0; grid-template-columns: 1fr 1fr">
-                  <label class="field">
-                    <span>Leasing</span>
-                    <select id="purchaseLeasingStatus">
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span>Leasing company</span>
-                    <input id="purchaseLeasingCompany" type="text" placeholder="e.g. ABC Finance" />
-                  </label>
-                  <label class="field">
-                    <span>Lease amount</span>
-                    <input id="purchaseLeaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="field">
-                    <span>Lease balance amount</span>
-                    <input id="purchaseLeaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="field">
-                    <span>Lease period</span>
-                    <input id="purchaseLeasePeriod" type="text" placeholder="e.g. 60 months" />
-                  </label>
-                  <label class="field field--full">
-                    <span>Lease balance period</span>
-                    <input id="purchaseLeaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
-                  </label>
+              <div class="field field--full" id="purchaseLeaseSectionHint" hidden>
+                <div class="row" style="align-items: center; gap: 12px; flex-wrap: wrap">
+                  <span class="muted">Leasing details apply to used vehicles.</span>
+                  <button type="button" class="btn btn--primary" id="btnOpenPurchaseLeaseDialog">Leasing details…</button>
                 </div>
               </div>
               <label class="field">
@@ -1406,6 +2180,156 @@
       </div>
     </dialog>
 
+    <dialog class="dialog dialog--vehicle" id="purchaseLeaseDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Leasing details</h3>
+          <button type="button" class="iconBtn" id="btnClosePurchaseLeaseDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <p class="muted" style="margin: 0 0 12px">Used vehicles — enter lease information if applicable.</p>
+          <div class="formGrid" style="padding: 0; grid-template-columns: 1fr 1fr">
+            <label class="field">
+              <span>Leasing</span>
+              <select id="purchaseLeasingStatus">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Leasing company</span>
+              <input id="purchaseLeasingCompany" type="text" placeholder="e.g. ABC Finance" />
+            </label>
+            <label class="field">
+              <span>Lease amount</span>
+              <input id="purchaseLeaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label class="field">
+              <span>Lease balance amount</span>
+              <input id="purchaseLeaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label class="field">
+              <span>Lease period</span>
+              <input id="purchaseLeasePeriod" type="text" placeholder="e.g. 60 months" />
+            </label>
+            <label class="field field--full">
+              <span>Lease balance period</span>
+              <input id="purchaseLeaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
+            </label>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px">
+            <button type="button" class="btn btn--primary" id="btnDonePurchaseLeaseDialog">Done</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="purchaseViewDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Purchase details</h3>
+          <button type="button" class="iconBtn" id="btnClosePurchaseViewDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div id="purchaseViewBody"></div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; gap: 8px">
+            <button type="button" class="btn btn--table btn--table-export" id="btnPurchaseViewPdf">Save PDF</button>
+            <button type="button" class="btn btn--table" id="btnPurchaseViewDownloadCsv">CSV</button>
+            <button type="button" class="btn btn--table" id="btnPurchaseViewCloseFooter">Close</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="vehicleSearchPickDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Vehicle search</h3>
+          <button type="button" class="iconBtn" id="btnCloseVehicleSearchPickDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <p class="muted" id="vehicleSearchPickSummary" style="margin: 0 0 12px"></p>
+          <div class="tableWrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Stock No.</th>
+                  <th>Vehicle number</th>
+                  <th>Vehicle</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="vehicleSearchPickTableBody"></tbody>
+            </table>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px">
+            <button type="button" class="btn btn--table" id="btnVehicleSearchPickCloseFooter">Close</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="vehicleQuickViewDialog">
+      <div class="dialog__card dialog__card--vehicle dialog__card--quickVehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Vehicle Quick view</h3>
+          <button type="button" class="iconBtn" id="btnCloseVehicleQuickViewDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div class="vehicleQuickView" id="vehicleQuickViewRoot">
+            <div class="vehicleQuickView__block">
+              <div class="vehicleQuickView__blockMain vehicleQuickView__blockMain--hero">
+                <div class="vehicleQuickView__imageWrap" id="vehicleQuickViewImageWrap">
+                  <span class="muted">No image</span>
+                </div>
+                <div class="vehicleQuickView__heroMeta" id="vehicleQuickViewHeroMeta"></div>
+              </div>
+              <div class="vehicleQuickView__blockSide" aria-hidden="true">Vehicle Quick view</div>
+            </div>
+            <div class="vehicleQuickView__block">
+              <div class="vehicleQuickView__blockMain">
+                <div class="row" style="flex-wrap: wrap; gap: 10px; align-items: center">
+                  <button type="button" class="btn btn--table btn--table-primary" id="btnVehicleQuickViewDocs">Docs</button>
+                  <button type="button" class="btn btn--table btn--table-export" id="btnVehicleQuickViewFullDetails">Full details</button>
+                </div>
+                <p class="muted vehicleQuickView__hint" id="vehicleQuickViewBeforeHint"></p>
+              </div>
+              <div class="vehicleQuickView__blockSide" aria-hidden="true">Before sale</div>
+            </div>
+            <div class="vehicleQuickView__block">
+              <div class="vehicleQuickView__blockMain">
+                <div class="row" style="flex-wrap: wrap; gap: 10px; align-items: center">
+                  <button type="button" class="btn btn--table btn--table-primary" id="btnVehicleQuickViewSoldDocs">Sold docs</button>
+                </div>
+                <p class="muted vehicleQuickView__hint" id="vehicleQuickViewAfterHint"></p>
+              </div>
+              <div class="vehicleQuickView__blockSide" aria-hidden="true">After sale</div>
+            </div>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; gap: 8px">
+            <button type="button" class="btn btn--table" id="btnVehicleQuickViewCloseFooter">Close</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="inventoryViewDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Vehicle details</h3>
+          <button type="button" class="iconBtn" id="btnCloseInventoryViewDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div id="inventoryViewBody"></div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; gap: 8px">
+            <button type="button" class="btn btn--table btn--table-export" id="btnInventoryViewPdf">Save PDF</button>
+            <button type="button" class="btn btn--table" id="btnInventoryViewOpenDocs">Docs</button>
+            <button type="button" class="btn btn--table" id="btnInventoryViewCloseFooter">Close</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="dialog dialog--vehicle" id="vehicleFormDialog">
       <div class="dialog__card dialog__card--vehicle">
         <div class="dialog__header">
@@ -1424,6 +2348,29 @@
                 <span>Stock No.</span>
                 <input id="stockNo" type="text" placeholder="e.g. STK-001" autocomplete="off" required />
               </label>
+              <div class="field field--full" style="grid-column: 1 / -1">
+                <span class="muted" style="display: block; margin-bottom: 8px; font-weight: 600">Vehicle owner (optional)</span>
+                <div class="formGrid" style="padding: 0">
+                  <label class="field">
+                    <span>First name</span>
+                    <input id="ownerFirstName" type="text" placeholder="e.g. Nimal" autocomplete="given-name" />
+                  </label>
+                  <label class="field">
+                    <span>Second name</span>
+                    <input id="ownerSecondName" type="text" placeholder="e.g. Perera" autocomplete="family-name" />
+                  </label>
+                  <label class="field field--full" style="grid-column: 1 / -1">
+                    <span>Owner type</span>
+                    <input
+                      id="ownerType"
+                      type="text"
+                      list="ownerTypeSuggestions"
+                      placeholder="Pick a suggestion or type your own"
+                      autocomplete="off"
+                    />
+                  </label>
+                </div>
+              </div>
               <label class="field">
                 <span>VIN / Chassis</span>
                 <input id="vin" type="text" placeholder="optional" autocomplete="off" />
@@ -1458,6 +2405,8 @@
                   <option value="Truck">Truck</option>
                   <option value="Pickup">Pickup</option>
                   <option value="Bike">Bike</option>
+                  <option value="Three wheeler">Three wheeler</option>
+                  <option value="Lorry">Lorry</option>
                 </select>
               </label>
               <label class="field">
@@ -1500,36 +2449,10 @@
                   <option value="Used">Used</option>
                 </select>
               </label>
-              <div class="field field--full" id="leaseSection" hidden>
-                <span>Leasing Details (Used Vehicles)</span>
-                <div class="formGrid" style="padding:0; grid-template-columns: 1fr 1fr;">
-                  <label class="field">
-                    <span>Leasing</span>
-                    <select id="leasingStatus">
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span>Leasing Company</span>
-                    <input id="leasingCompany" type="text" placeholder="e.g. ABC Finance" />
-                  </label>
-                  <label class="field">
-                    <span>Lease Amount</span>
-                    <input id="leaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="field">
-                    <span>Lease Balance Amount</span>
-                    <input id="leaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
-                  </label>
-                  <label class="field">
-                    <span>Lease Period</span>
-                    <input id="leasePeriod" type="text" placeholder="e.g. 60 months" />
-                  </label>
-                  <label class="field field--full">
-                    <span>Lease Balance Period</span>
-                    <input id="leaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
-                  </label>
+              <div class="field field--full" id="leaseSectionHint" hidden>
+                <div class="row" style="align-items: center; gap: 12px; flex-wrap: wrap">
+                  <span class="muted">Leasing details apply to used vehicles.</span>
+                  <button type="button" class="btn btn--primary" id="btnOpenVehicleLeaseDialog">Leasing details…</button>
                 </div>
               </div>
               <label class="field">
@@ -1574,6 +2497,194 @@
       </div>
     </dialog>
 
+    <dialog class="dialog dialog--vehicle" id="vehicleLeaseDialog">
+      <div class="dialog__card dialog__card--vehicle">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Leasing details</h3>
+          <button type="button" class="iconBtn" id="btnCloseVehicleLeaseDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <p class="muted" style="margin: 0 0 12px">Used vehicles — enter lease information if applicable.</p>
+          <div class="formGrid" style="padding: 0; grid-template-columns: 1fr 1fr">
+            <label class="field">
+              <span>Leasing</span>
+              <select id="leasingStatus">
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Leasing Company</span>
+              <input id="leasingCompany" type="text" placeholder="e.g. ABC Finance" />
+            </label>
+            <label class="field">
+              <span>Lease Amount</span>
+              <input id="leaseAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label class="field">
+              <span>Lease Balance Amount</span>
+              <input id="leaseBalanceAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label class="field">
+              <span>Lease Period</span>
+              <input id="leasePeriod" type="text" placeholder="e.g. 60 months" />
+            </label>
+            <label class="field field--full">
+              <span>Lease Balance Period</span>
+              <input id="leaseBalancePeriod" type="text" placeholder="e.g. 24 months" />
+            </label>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px">
+            <button type="button" class="btn btn--primary" id="btnDoneVehicleLeaseDialog">Done</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Menu icon sprite (professional line icons) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+      <symbol id="i-inventory" viewBox="0 0 24 24">
+        <path d="M21 8V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22 6 12 2 2 6l10 4 10-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M12 22V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-purchase" viewBox="0 0 24 24">
+        <path d="M6 2h9l3 3v17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15 2v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7 12h10M7 16h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-billing" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M3 10h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M7 15h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-ledger" viewBox="0 0 24 24">
+        <path d="M6 2h11a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M8 7h8M8 11h8M8 15h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-car" viewBox="0 0 24 24">
+        <path d="M3 16l1-4a4 4 0 0 1 4-3h8a4 4 0 0 1 4 3l1 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5 16h14v3a1 1 0 0 1-1 1h-1a2 2 0 0 1-2-2H9a2 2 0 0 1-2 2H6a1 1 0 0 1-1-1v-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7 16.5h.01M17 16.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-block" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M7.5 7.5 16.5 16.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-reports" viewBox="0 0 24 24">
+        <path d="M4 19V5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 16v-6M12 16V7M16 16v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-garage" viewBox="0 0 24 24">
+        <path d="M3 11 12 3l9 8v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V11Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M7 22v-8h10v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-quotation" viewBox="0 0 24 24">
+        <path d="M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M7 8h10M7 12h10M7 16h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-customer" viewBox="0 0 24 24">
+        <path d="M20 21a8 8 0 0 0-16 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M12 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-supplier" viewBox="0 0 24 24">
+        <path d="M3 7h12v10H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M15 10h3l3 3v4h-6v-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M6 19a1.5 1.5 0 1 0 0-.01M18 19a1.5 1.5 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-broker" viewBox="0 0 24 24">
+        <path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 21a7 7 0 0 1 12.5-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17 14l2 2 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-company" viewBox="0 0 24 24">
+        <path d="M3 22h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M5 22V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M9 8h.01M9 12h.01M9 16h.01M12 8h.01M12 12h.01M12 16h.01M15 8h.01M15 12h.01M15 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-users" viewBox="0 0 24 24">
+        <path d="M17 21a5 5 0 0 0-10 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M12 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20 21a6 6 0 0 0-4-5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24">
+        <path d="M7 2v3M17 2v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M4 6h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <rect x="4" y="4" width="16" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M8 11h4M8 15h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-report-sales" viewBox="0 0 24 24">
+        <path d="M4 19V5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M7 14l3-3 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-login" viewBox="0 0 24 24">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10 17l5-5-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15 12H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24">
+        <path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-home" viewBox="0 0 24 24">
+        <path d="M3 11 12 3l9 8v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V11Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M9 22v-7h6v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+
+      <!-- Vehicle type icons (Inventory Reports) -->
+      <symbol id="i-type-car" viewBox="0 0 24 24">
+        <path d="M3 16l1-4a4 4 0 0 1 4-3h8a4 4 0 0 1 4 3l1 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5 16h14v3a1 1 0 0 1-1 1h-1a2 2 0 0 1-2-2H9a2 2 0 0 1-2 2H6a1 1 0 0 1-1-1v-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-type-van" viewBox="0 0 24 24">
+        <path d="M3 16V7a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M16 10h3l2 2v4H3v-2h13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M7 18a1.5 1.5 0 1 0 0-.01M18 18a1.5 1.5 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type-bus" viewBox="0 0 24 24">
+        <path d="M6 3h12a2 2 0 0 1 2 2v12a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M7 7h10M7 11h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M7 20v1M17 20v1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 16h.01M16 16h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type-truck" viewBox="0 0 24 24">
+        <path d="M3 7h11v10H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M14 10h3l4 4v3h-7v-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M6 19a1.5 1.5 0 1 0 0-.01M18 19a1.5 1.5 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type-pickup" viewBox="0 0 24 24">
+        <path d="M3 10h11v7H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M14 12h4l3 3v2h-7v-5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M7 19a1.5 1.5 0 1 0 0-.01M18 19a1.5 1.5 0 1 0 0-.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type-bike" viewBox="0 0 24 24">
+        <circle cx="6.5" cy="17.5" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="17.5" cy="17.5" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M9 7h4l2 4h-6l2 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 7h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type-threewheeler" viewBox="0 0 24 24">
+        <circle cx="7" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="17" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <circle cx="12" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M4 14l2-5h8l3 3h3v4H4v-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M9 9V7h4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-type-other" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+    </svg>
+
     <dialog class="dialog" id="docsDialog">
       <form method="dialog" class="dialog__card" id="docsDialogForm">
         <div class="dialog__header">
@@ -1587,6 +2698,47 @@
             <label class="btn btn--primary" for="docsFileInput">Add Documents</label>
             <input id="docsFileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple />
             <button class="btn btn--danger" type="button" id="btnClearDocs">Clear Docs</button>
+          </div>
+
+          <div class="card" style="margin-top: 12px">
+            <div class="card__header">
+              <h3 style="margin: 0; font-size: 14px">Quick upload</h3>
+              <span class="badge badge--soft">Types</span>
+            </div>
+            <div class="formGrid" style="margin-top: 0">
+              <div class="field field--full">
+                <span>Owner Identity (Copy)</span>
+                <div class="row" style="flex-wrap: wrap">
+                  <label class="btn btn--primary" for="docsOwnerIdFrontInput">Front</label>
+                  <input id="docsOwnerIdFrontInput" type="file" accept="image/*,application/pdf,.pdf" hidden />
+                  <label class="btn btn--primary" for="docsOwnerIdBackInput">Back</label>
+                  <input id="docsOwnerIdBackInput" type="file" accept="image/*,application/pdf,.pdf" hidden />
+                </div>
+              </div>
+              <div class="field field--full">
+                <span>Vehicle photo</span>
+                <label class="btn btn--primary" for="docsVehiclePhotoInput">Upload</label>
+                <input id="docsVehiclePhotoInput" type="file" accept="image/*" hidden />
+              </div>
+              <div class="field field--full">
+                <span>Chassi number image</span>
+                <label class="btn btn--primary" for="docsChassiImageInput">Upload</label>
+                <input id="docsChassiImageInput" type="file" accept="image/*" hidden />
+              </div>
+              <div class="field field--full">
+                <span id="docsPurchaseLetterLabel">Purchased letter</span>
+                <label class="btn btn--primary" for="docsPurchaseLetterInput">Upload</label>
+                <input id="docsPurchaseLetterInput" type="file" accept="image/*,application/pdf,.pdf" hidden />
+              </div>
+              <div class="field field--full">
+                <span>Book copy</span>
+                <label class="btn btn--primary" for="docsBookCopyInput">Upload</label>
+                <input id="docsBookCopyInput" type="file" accept="image/*,application/pdf,.pdf" hidden />
+              </div>
+              <div class="muted field field--full" style="margin-top: -6px">
+                These files are stored inside POS data (browser storage) and can hit size limits.
+              </div>
+            </div>
           </div>
 
           <div class="muted mt12">
@@ -1609,9 +2761,9 @@
           <div class="docItem__sub muted"></div>
         </div>
         <div class="docItem__actions">
-          <a class="btn btn--ghost docItem__open" target="_blank" rel="noreferrer">View</a>
-          <a class="btn btn--ghost docItem__download" rel="noreferrer">Download</a>
-          <button class="btn btn--danger docItem__remove" type="button">Remove</button>
+          <a class="btn btn--table docItem__open" target="_blank" rel="noreferrer">View</a>
+          <a class="btn btn--table btn--table-export docItem__download" rel="noreferrer">Download</a>
+          <button class="btn btn--table btn--table-danger docItem__remove" type="button">Remove</button>
         </div>
       </div>
     </template>
