@@ -200,10 +200,6 @@ function createEmptyDb() {
       companyPhone: "",
       companyEmail: "",
       companyWebsite: "",
-      devCompanyName: "",
-      devCompanyPhone: "",
-      devCompanyEmail: "",
-      devCompanyWebsite: "",
       invoiceLogoDataUrl: "",
       invoiceSentAuto: false,
       invoiceSentTemplate: INVOICE_SENT_TEMPLATE,
@@ -3787,6 +3783,13 @@ function inventoryTypeIconId(typeKey) {
   return "i-type-other";
 }
 
+function appCopyrightText() {
+  const year = new Date().getFullYear();
+  // Requirement: use the app developer/company name (not the business/company info).
+  const developerName = "E-Inventory";
+  return `© ${year} ${developerName}. All rights reserved.`;
+}
+
 function saveInventoryReportSettings() {
   requirePerm("inventory report settings", PERMS.INVENTORY_EDIT);
 
@@ -5549,9 +5552,7 @@ function renderInvoicePreview() {
 
   const remarks = ($("#invoiceRemarks").value || "").trim();
   $("#invFooter").textContent = remarks || "Thank you.";
-  const year = new Date().getFullYear();
-  const companyName = db.meta.companyName || "E-Inventory";
-  $("#invCopyright").textContent = `© ${year} ${companyName}. All rights reserved.`;
+  $("#invCopyright").textContent = appCopyrightText();
 }
 
 function clearCart() {
@@ -6576,9 +6577,7 @@ function viewSale(saleId) {
   $("#invDocRevenue").textContent = docs.revenueLicence ? "✓" : "—";
   $("#invDocOthers").textContent = String(docs.others || "").trim() || "—";
   $("#invFooter").textContent = s.remarks || "Thank you.";
-  const year = new Date().getFullYear();
-  const companyName = db.meta.companyName || "E-Inventory";
-  $("#invCopyright").textContent = `© ${year} ${companyName}. All rights reserved.`;
+  $("#invCopyright").textContent = appCopyrightText();
 
   toast("Loaded sale into invoice preview.");
 }
@@ -7391,31 +7390,6 @@ function initEvents() {
     renderInvoiceBranding();
   });
 
-  document.querySelector("#devCompanyName")?.addEventListener("input", () => {
-    requirePerm("change developer info", PERMS.BRANDING_EDIT);
-    db.meta.devCompanyName = document.querySelector("#devCompanyName")?.value || "";
-    persist();
-    setCopyrightTexts();
-  });
-  document.querySelector("#devCompanyPhone")?.addEventListener("input", () => {
-    requirePerm("change developer info", PERMS.BRANDING_EDIT);
-    db.meta.devCompanyPhone = document.querySelector("#devCompanyPhone")?.value || "";
-    persist();
-    setCopyrightTexts();
-  });
-  document.querySelector("#devCompanyEmail")?.addEventListener("input", () => {
-    requirePerm("change developer info", PERMS.BRANDING_EDIT);
-    db.meta.devCompanyEmail = document.querySelector("#devCompanyEmail")?.value || "";
-    persist();
-    setCopyrightTexts();
-  });
-  document.querySelector("#devCompanyWebsite")?.addEventListener("input", () => {
-    requirePerm("change developer info", PERMS.BRANDING_EDIT);
-    db.meta.devCompanyWebsite = document.querySelector("#devCompanyWebsite")?.value || "";
-    persist();
-    setCopyrightTexts();
-  });
-
   ensureLedgerEntryDialogMount();
   $("#ledgerForm").addEventListener("submit", addLedgerEntryFromForm);
   $("#ledgerDate").value = todayISODate();
@@ -8067,15 +8041,7 @@ function initEvents() {
 }
 
 function setCopyrightTexts() {
-  const devName = String(db.meta.devCompanyName || "").trim();
-  const devPhone = String(db.meta.devCompanyPhone || "").trim();
-  const devEmail = String(db.meta.devCompanyEmail || "").trim();
-  const devWeb = String(db.meta.devCompanyWebsite || "").trim();
-  const companyName = String(db.meta.companyName || "").trim() || "E-Inventory";
-  const year = new Date().getFullYear();
-  const base = devName ? `© ${year} Developed by ${devName}` : `© ${year} ${companyName}. All rights reserved.`;
-  const tail = devName ? [devPhone, devEmail, devWeb].filter(Boolean).join(" · ") : "";
-  const text = tail ? `${base} · ${tail}` : base;
+  const text = appCopyrightText();
   const homeCopyright = document.querySelector("#homeCopyright");
   if (homeCopyright) homeCopyright.textContent = text;
   const loginCopyright = document.querySelector("#loginCopyright");
@@ -8324,15 +8290,6 @@ function renderInvoiceBranding() {
   $("#companyPhone").value = db.meta.companyPhone || "";
   $("#companyEmail").value = db.meta.companyEmail || "";
   $("#companyWebsite").value = db.meta.companyWebsite || "";
-  const devNameEl = document.querySelector("#devCompanyName");
-  const devPhoneEl = document.querySelector("#devCompanyPhone");
-  const devEmailEl = document.querySelector("#devCompanyEmail");
-  const devWebEl = document.querySelector("#devCompanyWebsite");
-  if (devNameEl) devNameEl.value = db.meta.devCompanyName || "";
-  if (devPhoneEl) devPhoneEl.value = db.meta.devCompanyPhone || "";
-  if (devEmailEl) devEmailEl.value = db.meta.devCompanyEmail || "";
-  if (devWebEl) devWebEl.value = db.meta.devCompanyWebsite || "";
-  setCopyrightTexts();
 
   // Build brand details in the order you requested:
   // Address, then Phone, then Email, then Website.
@@ -8563,10 +8520,6 @@ async function bootstrap() {
   db.cart = db.cart || { items: [], discount: 0, extras: [] };
   db.cart.items = Array.isArray(db.cart.items) ? db.cart.items : [];
   db.cart.extras = Array.isArray(db.cart.extras) ? db.cart.extras : [];
-  db.meta.devCompanyName = String(db.meta.devCompanyName || "");
-  db.meta.devCompanyPhone = String(db.meta.devCompanyPhone || "");
-  db.meta.devCompanyEmail = String(db.meta.devCompanyEmail || "");
-  db.meta.devCompanyWebsite = String(db.meta.devCompanyWebsite || "");
   if (typeof db.meta.invoiceSentAuto !== "boolean") db.meta.invoiceSentAuto = false;
   if (!String(db.meta.invoiceSentTemplate || "").trim()) db.meta.invoiceSentTemplate = INVOICE_SENT_TEMPLATE;
   if (String(db.meta.invoiceSentTemplate || "").trim() === INVOICE_SENT_TEMPLATE_OLD) {
