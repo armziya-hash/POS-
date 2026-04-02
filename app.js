@@ -476,7 +476,7 @@ async function refreshBusinessesFromServer() {
   }
 }
 
-async function loadBusinessData() {
+async function loadBusinessData({ silent = false } = {}) {
   if (!useRemoteDb) return;
   const biz = getActiveBusinessId();
   if (!biz) return;
@@ -484,16 +484,16 @@ async function loadBusinessData() {
   if (!ok || !body || !body.ok) return;
   if (body.data != null) {
     db = normalizeImportedDb(body.data);
-    saveDb(db);
+    saveDb(db, biz);
     renderAll();
-    toast("Business data loaded.");
+    if (!silent) toast("Business data loaded.");
     return;
   }
   // Initialize empty business snapshot
   db = createEmptyDb();
   persist();
   renderAll();
-  toast("Business initialized.");
+  if (!silent) toast("Business initialized.");
 }
 
 async function initRemoteStorage() {
@@ -3381,17 +3381,23 @@ function canOpenNav(tab) {
   return false;
 }
 
+/**
+ * Public Marketplace page (separate tab). Does not touch main POS session.
+ * Server mode: marketplace.html?biz=...  (loads via api/marketplace.php)
+ * Local mode:  marketplace.html?biz=...&local=1 (reads this browser's storage)
+ */
 function marketplaceUrl({ vehicleId = "", businessId = "", absolute = false } = {}) {
-  const u = new URL(location.href);
-  u.searchParams.set("marketplace", "1");
+  const biz =
+    String(businessId || "").trim() ||
+    String(getActiveBusinessId() || DEFAULT_BUSINESS_ID).trim() ||
+    DEFAULT_BUSINESS_ID;
+  const u = new URL("marketplace.html", location.href);
+  u.searchParams.set("biz", biz);
+  if (!useRemoteDb) u.searchParams.set("local", "1");
+  else u.searchParams.delete("local");
   if (vehicleId) u.searchParams.set("veh", String(vehicleId));
   else u.searchParams.delete("veh");
-  if (businessId) u.searchParams.set("biz", String(businessId));
-  else u.searchParams.delete("biz");
-  if (!absolute) {
-    return `${u.pathname}${u.search}`;
-  }
-  return u.toString();
+  return absolute ? u.toString() : `${u.pathname}${u.search}`;
 }
 
 function marketplaceCompanyMetaLine() {
@@ -3608,12 +3614,18 @@ function initNav() {
   const mm = document.querySelector("#mainMenu");
   const go = (tab) => {
     if (!canOpenNav(tab)) return toast(`No permission: ${tab}`);
+    if (tab === "marketplace") {
+      const url = marketplaceUrl({ absolute: true });
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      if (!w) toast("Popup blocked. Allow popups to open Marketplace.");
+      if (mm?.open) mm.open = false;
+      return;
+    }
     setActiveTab(tab);
     if (tab === "purchase") {
       renderPurchaseVehicleBrokerOptions();
       renderPurchasePartyOptions();
     }
-    if (tab === "marketplace") renderMarketplace();
     if (tab === "dailyReport") renderDailyReport();
     if (mm?.open) mm.open = false;
   };
@@ -3991,6 +4003,18 @@ function renderInventory() {
       openDocsDialog(v.id);
     });
 
+    const btnDelete = mkBtn("Delete", "btn btn--table btn--table-danger");
+    if (!can(PERMS.INVENTORY_DELETE)) {
+      btnDelete.disabled = true;
+      btnDelete.classList.remove("btn--table-danger");
+      btnDelete.classList.add("btn--table-muted");
+      btnDelete.title = "No permission to delete";
+    }
+    btnDelete.addEventListener("click", () => {
+      if (!can(PERMS.INVENTORY_DELETE)) return;
+      deleteVehicleById(v.id);
+    });
+
     const inCart = isInCart(v.id);
     const sold = v.status === "sold";
     const btnAdd = mkBtn(inCart ? "In cart" : "Add to cart", "btn btn--table");
@@ -4009,7 +4033,7 @@ function renderInventory() {
       setActiveTab("billing");
     });
 
-    actionsTd.append(btnEdit, btnView, btnDocs, btnAdd);
+    actionsTd.append(btnEdit, btnView, btnDocs, btnDelete, btnAdd);
     tbody.appendChild(tr);
   }
 
@@ -6103,6 +6127,49 @@ function resetPurchaseForm() {
   updatePurchaseLeaseSectionVisibility();
 }
 
+function deletePurchaseById(purchaseId) {
+  if (!isAdmin()) {
+    toast("Only admin can delete purchases.");
+    return;
+  }
+  const id = String(purchaseId || "").trim();
+  if (!id) return;
+  const recIdx = (Array.isArray(db.purchases) ? db.purchases : []).findIndex((x) => x.id === id);
+  if (recIdx < 0) {
+    toast("Purchase not found.");
+    return;
+  }
+  const p = db.purchases[recIdx];
+  const v = purchaseRecordVehicle(p);
+  const vehicleId = String(v?.id || "").trim();
+  if (vehicleId) {
+    const inv = getVehicleById(vehicleId);
+    if (inv?.status === "sold") {
+      toast("Cannot delete: vehicle is sold. Void the sale first if needed.");
+      return;
+    }
+    if (isInCart(vehicleId)) {
+      toast("Remove this vehicle from the cart before deleting the purchase.");
+      return;
+    }
+  }
+  const label = `${v?.stockNo || "—"} · ${vehicleLabel(v) || "vehicle"}`;
+  if (!confirm(`Delete this purchase and remove it from inventory?\n\n${label}`)) return;
+
+  db.purchases = (db.purchases || []).filter((x) => x.id !== id);
+  if (vehicleId) {
+    db.vehicles = (db.vehicles || []).filter((x) => x.id !== vehicleId);
+  }
+  if (editingPurchaseId === id) {
+    editingPurchaseId = null;
+    resetPurchaseForm();
+    closePurchaseFormDialog();
+  }
+  persist();
+  renderAll();
+  toast("Purchase deleted.");
+}
+
 function renderPurchases() {
   const tbody = document.querySelector("#purchaseTable tbody");
   if (!tbody) return;
@@ -6142,8 +6209,22 @@ function renderPurchases() {
       btnView.addEventListener("click", () => openPurchaseViewDialog(p.id));
       const btnEdit = mkBtn("Edit", "btn btn--table btn--table-primary");
       btnEdit.addEventListener("click", () => openPurchaseFormDialogForEdit(p.id));
+      const btnDelete = mkBtn("Delete", "btn btn--table btn--table-danger");
+      if (!isAdmin()) {
+        btnDelete.disabled = true;
+        btnDelete.classList.remove("btn--table-danger");
+        btnDelete.classList.add("btn--table-muted");
+        btnDelete.title = "Admin only";
+      } else {
+        btnDelete.title = "Delete purchase and linked inventory row";
+      }
+      btnDelete.addEventListener("click", () => {
+        if (!isAdmin()) return;
+        deletePurchaseById(p.id);
+      });
       actions.appendChild(btnView);
       actions.appendChild(btnEdit);
+      actions.appendChild(btnDelete);
     }
     tbody.appendChild(tr);
   }
@@ -6307,6 +6388,29 @@ function deleteVehicleFromForm() {
   persist();
   resetVehicleForm();
   closeVehicleFormDialog();
+  renderAll();
+  toast("Vehicle deleted.");
+}
+
+function deleteVehicleById(vehicleId) {
+  requirePerm("delete vehicle", PERMS.INVENTORY_DELETE);
+  const id = String(vehicleId || "").trim();
+  if (!id) return;
+  const v = getVehicleById(id);
+  if (!v) return toast("Vehicle not found.");
+
+  if (v.status === "sold") {
+    toast("Cannot delete a SOLD vehicle. Void the sale first (Reports).");
+    return;
+  }
+  if (isInCart(id)) {
+    toast("Remove from cart before deleting.");
+    return;
+  }
+  if (!confirm(`Delete vehicle ${v.stockNo} (${vehicleLabel(v)})?`)) return;
+
+  db.vehicles = (db.vehicles || []).filter((x) => x.id !== id);
+  persist();
   renderAll();
   toast("Vehicle deleted.");
 }
@@ -9651,6 +9755,17 @@ async function bootstrap() {
   await initRemoteStorage();
   if (!useRemoteDb) {
     auth = ensureAuthSeed();
+  }
+
+  // On refresh, make sure we load the correct business DB for the logged-in session.
+  // Otherwise the app may show another business' data (default DB) until you re-login.
+  if (currentUser()) {
+    if (useRemoteDb) {
+      await loadBusinessData({ silent: true });
+    } else {
+      const biz = getActiveBusinessId() || DEFAULT_BUSINESS_ID;
+      db = ensureBusinessDbInitialized(biz);
+    }
   }
 
   db.customers = Array.isArray(db.customers) ? db.customers : [];

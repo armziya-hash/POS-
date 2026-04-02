@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Marketplace · E-Inventory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="app">
+    <main class="container" style="padding-top: 20px; padding-bottom: 40px">
+      <div class="panel__header" style="margin-bottom: 14px">
+        <div>
+          <h2>Marketplace</h2>
+          <p class="muted">Available vehicles — share this page with customers.</p>
+        </div>
+        <div class="panel__actions">
+          <button class="btn" type="button" id="mpBtnCopyLink" title="Copy link to this page">Copy link</button>
+        </div>
+      </div>
+
+      <div class="marketHero card">
+        <div class="marketHero__top" style="grid-template-columns: 1fr">
+          <div class="marketHero__brand">
+            <div class="marketHero__logo" id="mpLogoMark" aria-hidden="true">EI</div>
+            <div>
+              <div class="marketHero__name" id="mpCompanyName">Loading…</div>
+              <div class="marketHero__meta muted" id="mpCompanyMeta">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="mpVehicleDetail" hidden></div>
+      <div class="marketGrid" id="mpGrid"></div>
+      <div class="card__footer muted" id="mpSummary">0 vehicles</div>
+    </main>
+    <div class="toast" id="mpToast" role="status" aria-live="polite"></div>
+    <script src="./marketplace.js"></script>
+  </body>
+</html>
