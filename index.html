@@ -40,6 +40,10 @@
           <svg class="navItem__icon" aria-hidden="true"><use href="#i-home" /></svg>
           Home
         </button>
+        <button class="navItem navItem--marketplace" type="button" data-nav="marketplace" title="Marketplace (share inventory)">
+          <svg class="navItem__icon" aria-hidden="true"><use href="#i-world" /></svg>
+          Marketplace
+        </button>
 
         <details class="menu" id="mainMenu">
           <summary class="navItem navItem--menu">
@@ -68,6 +72,7 @@
             <button class="menu__item" type="button" data-nav="suppliers"><svg class="menu__icon" aria-hidden="true"><use href="#i-supplier" /></svg>Supplier</button>
             <button class="menu__item" type="button" data-nav="brokers"><svg class="menu__icon" aria-hidden="true"><use href="#i-broker" /></svg>Broker</button>
             <button class="menu__item" type="button" data-nav="companyInfo"><svg class="menu__icon" aria-hidden="true"><use href="#i-company" /></svg>Company information</button>
+            <button class="menu__item" type="button" data-nav="businesses"><svg class="menu__icon" aria-hidden="true"><use href="#i-company" /></svg>Businesses</button>
             <button class="menu__item" type="button" data-nav="users"><svg class="menu__icon" aria-hidden="true"><use href="#i-users" /></svg>Users</button>
             <div class="menu__sep"></div>
             <div class="menu__account">
@@ -134,6 +139,39 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="panel" id="panel-marketplace" data-panel="marketplace" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Marketplace</h2>
+            <p class="muted">Share your available vehicles like an e-commerce listing.</p>
+          </div>
+          <div class="panel__actions">
+            <button class="btn" type="button" id="btnMarketplaceCopyLink" title="Copy marketplace link">Copy link</button>
+            <button class="btn btn--primary" type="button" id="btnMarketplaceBack" hidden>Back to list</button>
+          </div>
+        </div>
+
+        <div class="marketHero card">
+          <div class="marketHero__top">
+            <div class="marketHero__brand">
+              <div class="marketHero__logo" id="marketLogoMark" aria-hidden="true">EI</div>
+              <div>
+                <div class="marketHero__name" id="marketCompanyName">E-Inventory</div>
+                <div class="marketHero__meta muted" id="marketCompanyMeta">—</div>
+              </div>
+            </div>
+            <div class="marketHero__search">
+              <input id="marketSearch" class="input" type="search" placeholder="Search make, model, year, stock no..." />
+              <div class="muted" id="marketSearchSummary"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="marketVehicleDetail" hidden></div>
+        <div class="marketGrid" id="marketGrid"></div>
+        <div class="card__footer muted" id="marketSummary">0 vehicles</div>
       </section>
 
       <section class="panel" id="panel-inventory" data-panel="inventory" role="tabpanel">
@@ -1244,6 +1282,10 @@
                 <input id="companyPhone" type="tel" placeholder="Phone" />
               </label>
               <label class="field">
+                <span>Company phone 2</span>
+                <input id="companyPhone2" type="tel" placeholder="Second phone (optional)" />
+              </label>
+              <label class="field">
                 <span>Company email</span>
                 <input id="companyEmail" type="email" placeholder="Email" />
               </label>
@@ -1264,6 +1306,9 @@
                   title="Supports: {{Customer Name}}, {{Invoice Number}}, {{Amount}}, {{Company Name}}"
                 ></textarea>
               </label>
+            </div>
+            <div class="card__footer" style="display:flex; justify-content:flex-end; gap:10px;">
+              <button class="btn btn--primary" type="button" id="btnSaveCompanyInfo">Save Company Details</button>
             </div>
           </div>
 
@@ -1349,6 +1394,8 @@
                 <tr>
                   <th>Name</th>
                   <th>ID</th>
+                  <th>Status</th>
+                  <th class="actions">Actions</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -1965,9 +2012,66 @@
               <span>Temporary Password</span>
               <input id="newPassword" type="password" autocomplete="new-password" required />
             </label>
+            <label class="field">
+              <span>Confirm Password</span>
+              <input id="newPassword2" type="password" autocomplete="new-password" required />
+            </label>
+            <div class="field field--full">
+              <span>Permissions</span>
+              <div class="card" style="margin-top: 8px; border-radius: 12px;">
+                <div class="card__header" style="padding: 12px 14px;">
+                  <h3 style="margin:0; font-size: 13px;">Access</h3>
+                  <span class="badge badge--soft" id="userPermsSummary">Default by role</span>
+                </div>
+                <div class="card__body" style="padding: 12px 14px;">
+                  <label class="row" style="gap:10px; align-items:center; margin-bottom: 10px;">
+                    <input type="checkbox" id="permAll" />
+                    <span style="font-weight:700;">All permissions</span>
+                  </label>
+                  <div class="grid grid--2" id="userPermsGrid" style="gap: 10px;"></div>
+                </div>
+              </div>
+            </div>
             <div class="row row--between" style="margin-top: 8px;">
               <button class="btn btn--primary" type="submit">Create</button>
               <button class="btn btn--ghost" type="reset">Clear</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="editUserPermsDialog">
+      <div class="dialog__card dialog__card--vehicle dialog__card--login" style="max-width: 620px;">
+        <div class="dialog__header">
+          <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;">
+            <h3 style="margin:0;">Edit Permissions</h3>
+            <span class="badge badge--soft" id="editUserPermsWho">User</span>
+          </div>
+          <button type="button" class="iconBtn" id="btnCloseEditUserPermsDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <form id="editUserPermsForm" class="formGrid">
+            <input type="hidden" id="editUserPermsUserId" />
+            <div class="field field--full">
+              <span>Permissions</span>
+              <div class="card" style="margin-top: 8px; border-radius: 12px;">
+                <div class="card__header" style="padding: 12px 14px;">
+                  <h3 style="margin:0; font-size: 13px;">Access</h3>
+                  <span class="badge badge--soft" id="editUserPermsSummary">Custom</span>
+                </div>
+                <div class="card__body" style="padding: 12px 14px;">
+                  <label class="row" style="gap:10px; align-items:center; margin-bottom: 10px;">
+                    <input type="checkbox" id="editPermAll" />
+                    <span style="font-weight:700;">All permissions</span>
+                  </label>
+                  <div class="grid grid--2" id="editUserPermsGrid" style="gap: 10px;"></div>
+                </div>
+              </div>
+            </div>
+            <div class="row row--between" style="margin-top: 8px;">
+              <button class="btn btn--primary" type="submit">Save</button>
+              <button class="btn btn--ghost" type="button" id="btnCancelEditUserPerms">Cancel</button>
             </div>
           </form>
         </div>
@@ -2018,8 +2122,7 @@
                     <input
                       id="purchaseOwnerType"
                       type="text"
-                      list="ownerTypeSuggestions"
-                      placeholder="Pick a suggestion or type your own"
+                      placeholder="Optional"
                       autocomplete="off"
                     />
                   </label>
@@ -2336,8 +2439,7 @@
                     <input
                       id="ownerType"
                       type="text"
-                      list="ownerTypeSuggestions"
-                      placeholder="Pick a suggestion or type your own"
+                      placeholder="Optional"
                       autocomplete="off"
                     />
                   </label>
@@ -2513,6 +2615,71 @@
       </div>
     </dialog>
 
+    <dialog class="dialog dialog--vehicle" id="businessAdminsDialog">
+      <div class="dialog__card dialog__card--vehicle" style="width: min(760px, calc(100vw - 24px));">
+        <div class="dialog__header">
+          <h3 style="margin: 0" id="businessAdminsDialogTitle">Business admins</h3>
+          <button type="button" class="iconBtn" id="btnCloseBusinessAdminsDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <div class="muted" id="businessAdminsDialogSub" style="margin-bottom: 10px;"></div>
+          <div class="tableWrap">
+            <table class="table table--dense" id="businessAdminsTable">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; gap: 8px">
+            <button type="button" class="btn btn--table" id="btnBusinessAdminsCloseFooter">Close</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--vehicle" id="deleteBusinessDialog">
+      <div class="dialog__card dialog__card--vehicle" style="width: min(560px, calc(100vw - 24px));">
+        <div class="dialog__header">
+          <h3 style="margin: 0">Delete business</h3>
+          <button type="button" class="iconBtn" id="btnCloseDeleteBusinessDialog" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body dialog__body--vehicle">
+          <p class="muted" id="deleteBusinessSummary" style="margin-top:0;"></p>
+          <div class="card" style="margin-top:12px;">
+            <div class="card__header">
+              <h3 style="margin:0; font-size:14px;">Superadmin confirmation</h3>
+              <span class="badge badge--soft">Required</span>
+            </div>
+            <div class="card__body" style="padding: 12px 14px;">
+              <form id="deleteBusinessForm" class="formGrid">
+                <label class="field field--full">
+                  <span>Superadmin username</span>
+                  <input id="deleteBizSuperUser" type="text" autocomplete="username" placeholder="superadmin" required />
+                </label>
+                <label class="field field--full">
+                  <span>Superadmin password</span>
+                  <input id="deleteBizSuperPass" type="password" autocomplete="current-password" required />
+                </label>
+              </form>
+              <div class="muted" style="margin-top:10px; font-size:12px;">
+                This will permanently delete the business, its users, and its saved data on this device.
+              </div>
+            </div>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; gap: 8px">
+            <button type="button" class="btn btn--table" id="btnCancelDeleteBusiness">Cancel</button>
+            <button type="submit" form="deleteBusinessForm" class="btn btn--table btn--table-danger" id="btnConfirmDeleteBusiness">Delete</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
     <!-- Menu icon sprite (professional line icons) -->
     <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
       <symbol id="i-inventory" viewBox="0 0 24 24">
@@ -2538,6 +2705,11 @@
         <path d="M3 16l1-4a4 4 0 0 1 4-3h8a4 4 0 0 1 4 3l1 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M5 16h14v3a1 1 0 0 1-1 1h-1a2 2 0 0 1-2-2H9a2 2 0 0 1-2 2H6a1 1 0 0 1-1-1v-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M7 16.5h.01M17 16.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-world" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M3 12h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M12 3c2.7 2.5 4.2 5.6 4.2 9s-1.5 6.5-4.2 9c-2.7-2.5-4.2-5.6-4.2-9S9.3 5.5 12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
       </symbol>
       <symbol id="i-block" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -2726,6 +2898,23 @@
       </form>
     </dialog>
 
+    <dialog class="dialog" id="docPreviewDialog">
+      <form method="dialog" class="dialog__card" style="max-width: 980px;">
+        <div class="dialog__header">
+          <h3 style="margin:0" id="docPreviewTitle">Document preview</h3>
+          <button class="iconBtn" value="cancel" aria-label="Close">✕</button>
+        </div>
+        <div class="dialog__body">
+          <div class="muted" id="docPreviewSub" style="margin-bottom: 10px"></div>
+          <div class="docPreview" id="docPreviewBody"></div>
+        </div>
+        <div class="dialog__footer" style="justify-content: space-between;">
+          <a class="btn btn--table btn--table-export" id="docPreviewOpenNewTab" target="_blank" rel="noreferrer">Open in new tab</a>
+          <button class="btn" type="submit" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
     <template id="tplDocItem">
       <div class="docItem">
         <div class="docItem__meta">
@@ -2733,7 +2922,7 @@
           <div class="docItem__sub muted"></div>
         </div>
         <div class="docItem__actions">
-          <a class="btn btn--table docItem__open" target="_blank" rel="noreferrer">View</a>
+          <button class="btn btn--table docItem__open" type="button">View</button>
           <a class="btn btn--table btn--table-export docItem__download" rel="noreferrer">Download</a>
           <button class="btn btn--table btn--table-danger docItem__remove" type="button">Remove</button>
         </div>
@@ -2796,6 +2985,18 @@
               <span class="loginSwitch__label">Keep me logged in</span>
             </label>
 
+            <div class="loginField" style="margin-top: 8px;">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M3 22h18" />
+                  <path d="M5 22V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" />
+                </svg>
+              </span>
+              <select id="loginBusinessPick" class="loginField__input" aria-label="Business">
+                <option value="biz_default">Default Business</option>
+              </select>
+            </div>
+
             <p class="loginCard__error" id="loginError" role="alert"></p>
 
             <button type="submit" class="loginCard__submit" id="btnLogin">Log In</button>
@@ -2838,6 +3039,67 @@
         </div>
 
         <p class="loginPage__copyright" id="loginCopyright"></p>
+      </div>
+    </dialog>
+
+    <dialog class="dialog dialog--login" id="setupDialog">
+      <div class="loginPage">
+        <header class="loginPage__brand">
+          <div class="loginPage__brandTitle">One-time setup</div>
+          <div class="loginPage__brandSub">Set company name and superadmin password</div>
+        </header>
+
+        <div class="loginPage__panel" style="grid-template-columns: 1fr;">
+          <form class="loginCard" id="setupForm" novalidate>
+            <h2 class="loginCard__title">Setup</h2>
+
+            <div class="loginField">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M3 22h18" />
+                  <path d="M5 22V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" />
+                </svg>
+              </span>
+              <input id="setupCompanyName" class="loginField__input" type="text" placeholder="Company name" autocomplete="organization" required />
+            </div>
+
+            <div class="loginField">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </span>
+              <input id="setupSuperadminUser" class="loginField__input" type="text" placeholder="Superadmin username" value="superadmin" autocomplete="username" required />
+            </div>
+
+            <div class="loginField">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
+              <input id="setupSuperadminPass" class="loginField__input" type="password" placeholder="New password" autocomplete="new-password" required />
+            </div>
+
+            <div class="loginField">
+              <span class="loginField__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
+              <input id="setupSuperadminPass2" class="loginField__input" type="password" placeholder="Confirm password" autocomplete="new-password" required />
+            </div>
+
+            <p class="loginCard__error" id="setupError" role="alert"></p>
+
+            <button type="submit" class="loginCard__submit" id="btnRunSetup">Finish setup</button>
+          </form>
+        </div>
+
+        <p class="loginPage__copyright" id="setupCopyright"></p>
       </div>
     </dialog>
 

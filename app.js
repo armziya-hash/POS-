@@ -1,5 +1,6 @@
 /* Vehicle Sale POS - single file app logic (HTML/CSS/JS only) */
 
+// DB is stored per-business: `${DB_KEY}:${businessId}`
 const DB_KEY = "vehicle_pos_db_v1";
 const AUTH_KEY = "vehicle_pos_auth_v1";
 const SESSION_KEY = "vehicle_pos_session_v1";
@@ -51,6 +52,34 @@ const PERMS = {
   BRANDING_EDIT: "branding.edit",
 };
 
+/**
+ * Only these permissions appear as checkboxes in Create User / Edit Permissions.
+ * Remove lines here to hide options from the UI (RBAC still uses stored values).
+ */
+const USER_PERMISSION_PICKER_KEYS = [
+  PERMS.INVENTORY_VIEW,
+  PERMS.INVENTORY_EDIT,
+  PERMS.INVENTORY_DELETE,
+  PERMS.DOCS_MANAGE,
+  PERMS.BILLING_USE,
+  PERMS.BILLING_SALE,
+  PERMS.BILLING_PRINT,
+  PERMS.LEDGER_VIEW,
+  PERMS.LEDGER_ADD,
+  PERMS.LEDGER_DELETE,
+  PERMS.REPORTS_VIEW,
+  PERMS.REPORTS_EXPORT,
+  PERMS.REPORTS_VOID,
+  PERMS.USERS_MANAGE,
+  PERMS.DATA_IMPORT_EXPORT,
+  PERMS.DATA_RESET,
+  PERMS.BRANDING_EDIT,
+];
+
+function userPermissionPickerKeys() {
+  return USER_PERMISSION_PICKER_KEYS.slice();
+}
+
 const ROLE_PERMS = {
   cashier: [
     PERMS.INVENTORY_VIEW,
@@ -93,6 +122,7 @@ const ROLE_PERMS = {
   ],
   admin: ["*"],
   superadmin: ["*"],
+  business_admin: [PERMS.USERS_MANAGE, PERMS.INVENTORY_VIEW, PERMS.INVENTORY_EDIT, PERMS.DOCS_MANAGE, PERMS.BILLING_USE, PERMS.BILLING_SALE, PERMS.BILLING_PRINT, PERMS.LEDGER_VIEW, PERMS.LEDGER_ADD, PERMS.REPORTS_VIEW, PERMS.REPORTS_EXPORT, PERMS.DATA_IMPORT_EXPORT, PERMS.BRANDING_EDIT],
 };
 
 function uid(prefix = "id") {
@@ -165,6 +195,35 @@ function toast(msg) {
   toast._t = window.setTimeout(() => el.classList.remove("is-on"), 2200);
 }
 
+async function copyText(text) {
+  const t = String(text ?? "");
+  if (!t) return false;
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(t);
+      return true;
+    }
+  } catch {
+    // fall through
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.setAttribute("readonly", "readonly");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.left = "-1000px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch {
+    return false;
+  }
+}
+
 function $(sel) {
   const el = document.querySelector(sel);
   if (!el) throw new Error(`Missing element: ${sel}`);
@@ -175,18 +234,32 @@ function $$ (sel) {
   return Array.from(document.querySelectorAll(sel));
 }
 
-function loadDb() {
+function dbKeyForBusiness(businessId) {
+  const biz = String(businessId || "").trim() || DEFAULT_BUSINESS_ID;
+  return `${DB_KEY}:${biz}`;
+}
+
+function loadDb(businessId = DEFAULT_BUSINESS_ID) {
   try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const key = dbKeyForBusiness(businessId);
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw);
+    // Backward-compat: migrate legacy single-key DB into default business.
+    if (String(businessId) === DEFAULT_BUSINESS_ID) {
+      const legacy = localStorage.getItem(DB_KEY);
+      if (!legacy) return null;
+      const parsed = JSON.parse(legacy);
+      localStorage.setItem(key, JSON.stringify(parsed));
+      return parsed;
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-function saveDb(db) {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+function saveDb(db, businessId = DEFAULT_BUSINESS_ID) {
+  localStorage.setItem(dbKeyForBusiness(businessId), JSON.stringify(db));
 }
 
 function createEmptyDb() {
@@ -198,6 +271,7 @@ function createEmptyDb() {
       companyName: "E-Inventory",
       companyAddress: "",
       companyPhone: "",
+      companyPhone2: "",
       companyEmail: "",
       companyWebsite: "",
       invoiceLogoDataUrl: "",
@@ -210,6 +284,7 @@ function createEmptyDb() {
       dailyTillSessions: {},
       /** Default terms for new quotations (editable under Quotation). */
       quotationTerms: DEFAULT_QUOTATION_TERMS,
+      initialSetupDone: false,
     },
     vehicles: [],
     brokers: [],
@@ -225,7 +300,8 @@ function createEmptyDb() {
   };
 }
 
-let db = loadDb() ?? createEmptyDb();
+// Start with default business DB; will be swapped on login / business switch.
+let db = loadDb(DEFAULT_BUSINESS_ID) ?? createEmptyDb();
 let useRemoteDb = false;
 let persistTimer = null;
 
@@ -304,8 +380,43 @@ function normalizeImportedDb(parsed) {
 function getActiveBusinessId() {
   const u = currentUser();
   if (!u) return null;
-  if (u.role === "superadmin") return auth.session?.activeBusinessId || null;
-  return u.businessId || DEFAULT_BUSINESS_ID;
+  if (u.role === "superadmin") return auth.session?.activeBusinessId || DEFAULT_BUSINESS_ID;
+  return u.businessId || auth.session?.activeBusinessId || DEFAULT_BUSINESS_ID;
+}
+
+function localBusinesses() {
+  auth.businesses = Array.isArray(auth.businesses) ? auth.businesses : [];
+  if (!auth.businesses.length) {
+    auth.businesses = [{ id: DEFAULT_BUSINESS_ID, name: "Default Business", disabled: false, createdAt: nowIso() }];
+    auth.updatedAt = nowIso();
+    saveAuth(auth);
+  }
+  return auth.businesses;
+}
+
+function ensureBusinessDbInitialized(bizId) {
+  const biz = String(bizId || "").trim() || DEFAULT_BUSINESS_ID;
+  const existing = loadDb(biz);
+  if (existing) return existing;
+  const bName = localBusinesses().find((b) => b.id === biz)?.name || "E-Inventory";
+  const fresh = createEmptyDb();
+  fresh.meta.companyName = String(bName || "").trim() || fresh.meta.companyName;
+  saveDb(fresh, biz);
+  return fresh;
+}
+
+function switchActiveBusinessLocal(bizId) {
+  const biz = String(bizId || "").trim() || "";
+  if (!biz) return;
+  auth.session = auth.session || { user: currentUser(), loggedInAt: nowIso(), activeBusinessId: biz };
+  auth.session.activeBusinessId = biz;
+  saveSession(auth.session);
+  db = ensureBusinessDbInitialized(biz);
+  renderAll();
+  renderInvoiceBranding();
+  setCopyrightTexts();
+  setUserUi();
+  toast("Business switched.");
 }
 
 async function fetchPosApi(path, options = {}) {
@@ -445,12 +556,15 @@ function ensureAuthSeed() {
   if (auth && Array.isArray(auth.users)) {
     // session is intentionally not persisted across browser close
     auth.session = loadSession();
+    auth.businesses = Array.isArray(auth.businesses) ? auth.businesses : [{ id: DEFAULT_BUSINESS_ID, name: "Default Business", disabled: false, createdAt: nowIso() }];
     return auth;
   }
   const seeded = {
+    businesses: [{ id: DEFAULT_BUSINESS_ID, name: "Default Business", disabled: false, createdAt: nowIso() }],
     users: [
-      { id: uid("usr"), username: "admin", password: "admin123", role: "admin", name: "Admin", disabled: false },
-      { id: uid("usr"), username: "cashier", password: "cashier123", role: "cashier", name: "Cashier", disabled: false },
+      { id: uid("usr"), username: "superadmin", password: "superadmin123", role: "superadmin", name: "Super Admin", disabled: false, businessId: DEFAULT_BUSINESS_ID },
+      { id: uid("usr"), username: "admin", password: "admin123", role: "admin", name: "Admin", disabled: false, businessId: DEFAULT_BUSINESS_ID },
+      { id: uid("usr"), username: "cashier", password: "cashier123", role: "cashier", name: "Cashier", disabled: false, businessId: DEFAULT_BUSINESS_ID },
     ],
     session: loadSession(),
     updatedAt: nowIso(),
@@ -470,11 +584,193 @@ function isSuperAdmin() {
 }
 
 function isAdmin() {
-  return currentUser()?.role === "admin";
+  const r = currentUser()?.role;
+  // "Admin-only" UI (purchase, suppliers, brokers, void sale, etc.) applies to these roles.
+  // Note: this is separate from `can(PERMS.*)` — legacy code used role === "admin" only,
+  // which incorrectly hid Purchase/Supplier for superadmin and business_admin.
+  return r === "admin" || r === "superadmin" || r === "business_admin";
 }
 
 function rolePerms(role) {
   return ROLE_PERMS[role] ?? [];
+}
+
+function allPermKeys() {
+  return Object.values(PERMS);
+}
+
+function permLabel(p) {
+  const map = {
+    [PERMS.INVENTORY_VIEW]: "Inventory: View",
+    [PERMS.INVENTORY_EDIT]: "Inventory: Edit",
+    [PERMS.INVENTORY_DELETE]: "Inventory: Delete",
+    [PERMS.DOCS_MANAGE]: "Docs: Manage",
+    [PERMS.BILLING_USE]: "Billing: Use",
+    [PERMS.BILLING_SALE]: "Billing: Complete sale",
+    [PERMS.BILLING_PRINT]: "Billing: Print",
+    [PERMS.LEDGER_VIEW]: "Ledger: View",
+    [PERMS.LEDGER_ADD]: "Ledger: Add",
+    [PERMS.LEDGER_DELETE]: "Ledger: Delete",
+    [PERMS.REPORTS_VIEW]: "Reports: View",
+    [PERMS.REPORTS_EXPORT]: "Reports: Export",
+    [PERMS.REPORTS_VOID]: "Reports: Void",
+    [PERMS.USERS_MANAGE]: "Users: Manage",
+    [PERMS.DATA_IMPORT_EXPORT]: "Data: Import/Export",
+    [PERMS.DATA_RESET]: "Data: Reset",
+    [PERMS.BRANDING_EDIT]: "Branding: Edit",
+  };
+  return map[p] || p;
+}
+
+function renderUserPermsPicker(selectedPerms) {
+  const grid = document.querySelector("#userPermsGrid");
+  const allCb = document.querySelector("#permAll");
+  const summary = document.querySelector("#userPermsSummary");
+  if (!grid) return;
+  const sel = Array.isArray(selectedPerms) ? selectedPerms : [];
+  const isAll = sel.includes("*");
+  if (allCb) allCb.checked = isAll;
+  grid.innerHTML = "";
+  const perms = allPermKeys().slice().sort((a, b) => permLabel(a).localeCompare(permLabel(b)));
+  for (const p of perms) {
+    const id = `perm_${p.replaceAll(".", "_")}`;
+    const wrap = document.createElement("label");
+    wrap.className = "row";
+    wrap.style.gap = "10px";
+    wrap.style.alignItems = "center";
+    wrap.style.margin = "0";
+    wrap.innerHTML = `
+      <input type="checkbox" data-perm="${escapeAttr(p)}" id="${escapeAttr(id)}" />
+      <span>${escapeHtml(permLabel(p))}</span>
+    `;
+    const cb = wrap.querySelector("input");
+    if (cb) cb.checked = isAll || sel.includes(p);
+    grid.appendChild(wrap);
+  }
+  const updateDisabled = () => {
+    const isAllNow = !!document.querySelector("#permAll")?.checked;
+    grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
+      el.disabled = isAllNow;
+    });
+    if (summary) {
+      summary.textContent = isAllNow ? "All permissions" : "Custom permissions";
+    }
+  };
+  if (allCb) {
+    allCb.onchange = () => updateDisabled();
+  }
+  grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
+    el.addEventListener("change", () => {
+      if (summary) summary.textContent = "Custom permissions";
+      if (allCb) allCb.checked = false;
+      updateDisabled();
+    });
+  });
+  updateDisabled();
+}
+
+function getSelectedPermsFromUserForm() {
+  const allCb = document.querySelector("#permAll");
+  if (allCb?.checked) return ["*"];
+  const picked = Array.from(document.querySelectorAll("#userPermsGrid input[type=checkbox][data-perm]"))
+    .filter((el) => el.checked)
+    .map((el) => el.dataset.perm)
+    .filter(Boolean);
+  return picked;
+}
+
+function renderEditUserPermsPicker(selectedPerms) {
+  const grid = document.querySelector("#editUserPermsGrid");
+  const allCb = document.querySelector("#editPermAll");
+  const summary = document.querySelector("#editUserPermsSummary");
+  if (!grid) return;
+  const sel = Array.isArray(selectedPerms) ? selectedPerms : [];
+  const isAll = sel.includes("*");
+  if (allCb) allCb.checked = isAll;
+  grid.innerHTML = "";
+  const perms = userPermissionPickerKeys().sort((a, b) => permLabel(a).localeCompare(permLabel(b)));
+  for (const p of perms) {
+    const id = `edit_perm_${p.replaceAll(".", "_")}`;
+    const wrap = document.createElement("label");
+    wrap.className = "row";
+    wrap.style.gap = "10px";
+    wrap.style.alignItems = "center";
+    wrap.style.margin = "0";
+    wrap.innerHTML = `
+      <input type="checkbox" data-perm="${escapeAttr(p)}" id="${escapeAttr(id)}" />
+      <span>${escapeHtml(permLabel(p))}</span>
+    `;
+    const cb = wrap.querySelector("input");
+    if (cb) cb.checked = isAll || sel.includes(p);
+    grid.appendChild(wrap);
+  }
+  const updateDisabled = () => {
+    const isAllNow = !!document.querySelector("#editPermAll")?.checked;
+    grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
+      el.disabled = isAllNow;
+    });
+    if (summary) summary.textContent = isAllNow ? "All permissions" : "Custom";
+  };
+  if (allCb) allCb.onchange = () => updateDisabled();
+  grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
+    el.addEventListener("change", () => {
+      if (summary) summary.textContent = "Custom";
+      if (allCb) allCb.checked = false;
+      updateDisabled();
+    });
+  });
+  updateDisabled();
+}
+
+function getSelectedPermsFromEditDialog() {
+  const allCb = document.querySelector("#editPermAll");
+  if (allCb?.checked) return ["*"];
+  const picked = Array.from(document.querySelectorAll("#editUserPermsGrid input[type=checkbox][data-perm]"))
+    .filter((el) => el.checked)
+    .map((el) => el.dataset.perm)
+    .filter(Boolean);
+  return picked;
+}
+
+function openEditUserPermsDialog(userId) {
+  requirePerm("manage users", PERMS.USERS_MANAGE);
+  const dlg = document.querySelector("#editUserPermsDialog");
+  if (!dlg || typeof dlg.showModal !== "function") return;
+  const u = (auth.users || []).find((x) => String(x.id) === String(userId));
+  if (!u) return toast("User not found.");
+  const isAdminUser = normalizeUsername(u.username) === "admin";
+  if (isAdminUser) return toast('Cannot edit permissions for "admin".');
+
+  const who = document.querySelector("#editUserPermsWho");
+  if (who) who.textContent = `${u.username} (${u.role || ""})`;
+  const idEl = document.querySelector("#editUserPermsUserId");
+  if (idEl) idEl.value = u.id;
+
+  const permsArr = Array.isArray(u.permissions) ? u.permissions : rolePerms(u.role);
+  renderEditUserPermsPicker(permsArr);
+  dlg.showModal();
+}
+
+async function saveEditUserPermsFromForm(e) {
+  e.preventDefault();
+  requirePerm("manage users", PERMS.USERS_MANAGE);
+  await migratePasswordsToHash();
+
+  const userId = document.querySelector("#editUserPermsUserId")?.value || "";
+  const u = (auth.users || []).find((x) => String(x.id) === String(userId));
+  if (!u) return toast("User not found.");
+  const isAdminUser = normalizeUsername(u.username) === "admin";
+  if (isAdminUser) return toast('Cannot edit permissions for "admin".');
+
+  const prior = Array.isArray(u.permissions) ? u.permissions : rolePerms(u.role);
+  const picked = getSelectedPermsFromEditDialog();
+  if (!picked.length) return toast("Select at least one permission (or All).");
+  u.permissions = picked.includes("*") ? ["*"] : mergePermissionsWithPicker(prior, picked);
+  auth.updatedAt = nowIso();
+  saveAuth(auth);
+  toast("Permissions updated.");
+  document.querySelector("#editUserPermsDialog")?.close();
+  renderUsers();
 }
 
 function can(perm) {
@@ -534,7 +830,7 @@ function updateMainMenuAccount() {
         <div class="menu__accountMuted" style="margin-bottom:6px;">Active business</div>
         <select id="activeBusinessPick" class="input" style="min-height:42px;">
           <option value="">— Select business —</option>
-          ${(businessesCache || [])
+          ${(!useRemoteDb ? localBusinesses() : (businessesCache || []))
             .map((b) => `<option value="${escapeAttr(b.id)}">${escapeHtml(b.name || b.id)}</option>`)
             .join("")}
         </select>
@@ -555,19 +851,15 @@ function updateMainMenuAccount() {
     if (pick) {
       pick.value = auth.session?.activeBusinessId || "";
       pick.onchange = async () => {
-        auth.session.activeBusinessId = pick.value || "";
-        saveSession(auth.session);
-        if (auth.session.activeBusinessId) {
-          if (USE_SUPABASE) {
-            const payload = await supabaseLoadBusinessData(auth.session.activeBusinessId);
-            db = payload ? normalizeImportedDb(payload) : createEmptyDb();
-            saveDb(db);
-            renderAll();
-            toast("Business data loaded.");
-          } else {
-            await loadBusinessData();
-          }
+        const next = pick.value || "";
+        if (!next) return;
+        if (!useRemoteDb) {
+          switchActiveBusinessLocal(next);
+          return;
         }
+        auth.session.activeBusinessId = next;
+        saveSession(auth.session);
+        await loadBusinessData();
       };
     }
   }
@@ -611,8 +903,6 @@ function setUserUi() {
   if (btnLogout) btnLogout.hidden = true;
   if (btnMenuLogin) btnMenuLogin.hidden = true;
   if (btnMenuLogout) btnMenuLogout.hidden = false;
-
-  const admin = isAdmin();
 
   // RBAC controls
   $("#btnResetAll").disabled = !can(PERMS.DATA_RESET);
@@ -737,6 +1027,28 @@ function openLogin() {
   $("#loginError").textContent = "";
   $("#loginUsername").value = "";
   $("#loginPassword").value = "";
+  const pick = document.querySelector("#loginBusinessPick");
+  if (pick) {
+    const list = !useRemoteDb ? localBusinesses() : (businessesCache || []);
+    const cur = pick.value || DEFAULT_BUSINESS_ID;
+    pick.innerHTML = "";
+    const raw = list.filter((b) => b && !b.disabled);
+    const def = raw.find((b) => String(b.id) === DEFAULT_BUSINESS_ID);
+    const rest = raw
+      .filter((b) => String(b.id) !== DEFAULT_BUSINESS_ID)
+      .slice()
+      .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
+    const ordered = def ? [def, ...rest] : rest;
+    for (const b of ordered) {
+      const opt = document.createElement("option");
+      opt.value = b.id || "";
+      opt.textContent = String(b.id) === DEFAULT_BUSINESS_ID ? "Default Business" : b.name || b.id;
+      pick.appendChild(opt);
+    }
+    const hasCur = cur && Array.from(pick.options).some((o) => o.value === cur);
+    const hasDefault = Array.from(pick.options).some((o) => o.value === DEFAULT_BUSINESS_ID);
+    pick.value = hasCur ? cur : hasDefault ? DEFAULT_BUSINESS_ID : pick.options[0]?.value || DEFAULT_BUSINESS_ID;
+  }
   setCopyrightTexts();
   d.showModal();
   setTimeout(() => $("#loginUsername").focus(), 0);
@@ -745,6 +1057,28 @@ function openLogin() {
 function closeLogin() {
   const d = $("#loginDialog");
   if (d.open) d.close();
+}
+
+function openSetup() {
+  const d = document.querySelector("#setupDialog");
+  if (!d || typeof d.showModal !== "function") return;
+  const err = document.querySelector("#setupError");
+  if (err) err.textContent = "";
+  const cn = document.querySelector("#setupCompanyName");
+  if (cn) cn.value = String(db.meta.companyName || "").trim() || "E-Inventory";
+  const su = document.querySelector("#setupSuperadminUser");
+  if (su) su.value = String(su.value || "").trim() || "superadmin";
+  const p1 = document.querySelector("#setupSuperadminPass");
+  const p2 = document.querySelector("#setupSuperadminPass2");
+  if (p1) p1.value = "";
+  if (p2) p2.value = "";
+  setCopyrightTexts();
+  d.showModal();
+  setTimeout(() => cn?.focus(), 0);
+}
+
+function closeSetup() {
+  document.querySelector("#setupDialog")?.close();
 }
 
 function normalizeUsername(u) {
@@ -784,11 +1118,90 @@ async function migratePasswordsToHash() {
       u.disabled = false;
       changed = true;
     }
+    if (u.role !== "superadmin" && !u.businessId) {
+      u.businessId = DEFAULT_BUSINESS_ID;
+      changed = true;
+    }
   }
   if (changed) {
     auth.updatedAt = nowIso();
     saveAuth(auth);
   }
+}
+
+async function runOneTimeSetupFromForm(e) {
+  e?.preventDefault?.();
+  const err = document.querySelector("#setupError");
+  if (err) err.textContent = "";
+
+  const companyName = String(document.querySelector("#setupCompanyName")?.value || "").trim();
+  const suNameRaw = String(document.querySelector("#setupSuperadminUser")?.value || "").trim();
+  const suName = normalizeUsername(suNameRaw);
+  const p1 = String(document.querySelector("#setupSuperadminPass")?.value || "");
+  const p2 = String(document.querySelector("#setupSuperadminPass2")?.value || "");
+
+  if (!companyName) {
+    if (err) err.textContent = "Enter company name.";
+    return;
+  }
+  if (!suName) {
+    if (err) err.textContent = "Enter superadmin username.";
+    return;
+  }
+  if (p1.length < 6) {
+    if (err) err.textContent = "Password must be at least 6 characters.";
+    return;
+  }
+  if (p1 !== p2) {
+    if (err) err.textContent = "Passwords do not match.";
+    return;
+  }
+
+  // Update company name
+  db.meta.companyName = companyName;
+  db.meta.updatedAt = nowIso();
+  db.meta.initialSetupDone = true;
+  saveDb(db);
+
+  // Ensure auth exists and has a superadmin user
+  auth = ensureAuthSeed();
+  auth.users = Array.isArray(auth.users) ? auth.users : [];
+  let su = auth.users.find((u) => normalizeUsername(u.username) === "superadmin" || u.role === "superadmin");
+  if (!su) {
+    su = { id: uid("usr"), username: "superadmin", role: "superadmin", name: "Super Admin", disabled: false };
+    auth.users.unshift(su);
+  }
+  su.username = suName;
+  su.name = su.name || "Super Admin";
+  su.role = "superadmin";
+  su.disabled = false;
+  su.passwordHash = await hashPassword(su.username, p1);
+  delete su.password;
+  auth.updatedAt = nowIso();
+  saveAuth(auth);
+
+  // Auto-login superadmin after setup
+  auth.session = {
+    user: {
+      id: su.id,
+      username: su.username,
+      name: su.name || su.username,
+      role: "superadmin",
+      businessId: DEFAULT_BUSINESS_ID,
+      permissions: ["*"],
+    },
+    loggedInAt: nowIso(),
+    activeBusinessId: DEFAULT_BUSINESS_ID,
+  };
+  saveAuth(auth);
+  saveSession(auth.session);
+
+  closeSetup();
+  renderAll();
+  renderInvoiceBranding();
+  setCopyrightTexts();
+  setUserUi();
+  toast("Setup complete.");
 }
 
 async function login(username, password) {
@@ -891,15 +1304,26 @@ async function login(username, password) {
   const passHash = await hashPassword(uname, pass);
   const u = auth.users.find((x) => normalizeUsername(x.username) === uname && x.passwordHash === passHash);
   if (!u || u.disabled) return false;
+  // Business selection (local mode)
+  const pickedBiz = String(document.querySelector("#loginBusinessPick")?.value || "").trim() || DEFAULT_BUSINESS_ID;
+  if (u.role !== "superadmin") {
+    const uBiz = String(u.businessId || DEFAULT_BUSINESS_ID);
+    if (pickedBiz && pickedBiz !== uBiz) {
+      lastLoginError = "This user is not assigned to the selected business.";
+      return false;
+    }
+  }
   auth.session = {
     user: {
       id: u.id,
       username: u.username,
       name: u.name,
       role: u.role,
+      businessId: u.role === "superadmin" ? null : (u.businessId || DEFAULT_BUSINESS_ID),
       permissions: ROLE_PERMS[u.role] ?? u.permissions ?? [],
     },
     loggedInAt: nowIso(),
+    activeBusinessId: u.role === "superadmin" ? pickedBiz : (u.businessId || DEFAULT_BUSINESS_ID),
   };
   auth.updatedAt = nowIso();
   saveAuth(auth);
@@ -907,6 +1331,12 @@ async function login(username, password) {
   setUserUi();
   closeLogin();
   toast(`Logged in as ${u.role}.`);
+  if (!useRemoteDb) {
+    const biz = getActiveBusinessId() || DEFAULT_BUSINESS_ID;
+    db = ensureBusinessDbInitialized(biz);
+    renderAll();
+    renderInvoiceBranding();
+  }
   return true;
 }
 
@@ -937,7 +1367,8 @@ function renderUsers() {
   tbody.innerHTML = "";
   const q = ($("#userSearch").value || "").trim();
 
-  if (isSuperAdmin() && !getActiveBusinessId()) {
+  const activeBiz = getActiveBusinessId();
+  if (!activeBiz) {
     tbody.innerHTML = `<tr><td colspan="6" class="muted">Select an Active Business from Main Menu → Account.</td></tr>`;
     const summary = document.querySelector("#usersSummary");
     if (summary) summary.textContent = "0 users";
@@ -947,6 +1378,14 @@ function renderUsers() {
   const list = (auth.users || [])
     .slice()
     .sort((a, b) => normalizeUsername(a.username).localeCompare(normalizeUsername(b.username)))
+    .filter((u) => {
+      const ub = String(u.businessId || DEFAULT_BUSINESS_ID);
+      // Superadmin sees active business users; business_admin also sees only their business.
+      if (isSuperAdmin()) return ub === String(activeBiz);
+      if (String(currentUser()?.role) === "business_admin") return ub === String(activeBiz) && u.role !== "superadmin";
+      // admin: keep current behavior (all local users), but still default-filter to active business for consistency
+      return ub === String(activeBiz);
+    })
     .filter((u) => userMatchesQuery(u, q));
 
   for (const u of list) {
@@ -969,16 +1408,26 @@ function renderUsers() {
     const isSelf = currentUser()?.id && u.id === currentUser()?.id;
     const isAdminUser = normalizeUsername(u.username) === "admin";
 
-    const btnToggle = mkBtn(u.disabled ? "Enable" : "Disable", "btn btn--table");
+    const btnPerms = mkBtn("Permissions", "btn btn--table btn--table-primary btn--table-compact");
+    btnPerms.disabled = isAdminUser;
+    btnPerms.title = btnPerms.disabled ? 'Cannot edit permissions for "admin"' : "";
+    btnPerms.addEventListener("click", () => openEditUserPermsDialog(u.id));
+
+    const btnToggle = mkBtn(u.disabled ? "Enable" : "Disable", "btn btn--table btn--table-compact");
     btnToggle.disabled = isAdminUser || isSelf;
     btnToggle.title = btnToggle.disabled ? "Cannot disable this user" : "";
     btnToggle.addEventListener("click", () => toggleUserDisabled(u.id));
 
-    const btnReset = mkBtn("Reset PW", "btn btn--table btn--table-primary");
+    const btnReset = mkBtn("Reset PW", "btn btn--table btn--table-primary btn--table-compact");
     btnReset.disabled = isAdminUser && isSelf;
     btnReset.addEventListener("click", () => resetUserPassword(u.id));
 
-    actions.append(btnToggle, btnReset);
+    const btnDelete = mkBtn("Delete", "btn btn--table btn--table-danger btn--table-compact");
+    btnDelete.disabled = isAdminUser || isSelf;
+    btnDelete.title = btnDelete.disabled ? "Cannot delete this user" : "";
+    btnDelete.addEventListener("click", () => deleteUser(u.id));
+
+    actions.append(btnPerms, btnToggle, btnReset, btnDelete);
     tbody.appendChild(tr);
   }
 
@@ -990,10 +1439,26 @@ async function createBusinessFromForm(e) {
   if (!isSuperAdmin()) return toast("Super Admin only.");
   const name = (document.querySelector("#businessName")?.value || "").trim();
   if (!name) return toast("Business name required.");
-  const { ok, body } = await fetchPosApi("businesses.php", {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
+  if (!useRemoteDb) {
+    const id = uid("biz");
+    const biz = { id, name, disabled: false, createdAt: nowIso() };
+    const list = localBusinesses();
+    list.push(biz);
+    auth.businesses = list;
+    auth.updatedAt = nowIso();
+    saveAuth(auth);
+    // init empty DB for this business
+    const fresh = createEmptyDb();
+    fresh.meta.companyName = name;
+    fresh.meta.initialSetupDone = true;
+    saveDb(fresh, id);
+    businessesCache = list;
+    document.querySelector("#businessForm")?.reset();
+    renderBusinessesUi();
+    toast("Business created.");
+    return;
+  }
+  const { ok, body } = await fetchPosApi("businesses.php", { method: "POST", body: JSON.stringify({ name }) });
   if (!ok || !body || !body.ok) return toast(body?.error || "Could not create business.");
   document.querySelector("#businessForm")?.reset();
   await refreshBusinessesFromServer();
@@ -1009,6 +1474,29 @@ async function createBusinessAdminFromForm(e) {
   const name = (document.querySelector("#businessAdminName")?.value || "").trim();
   const password = document.querySelector("#businessAdminPassword")?.value || "";
   if (!businessId || !username || !name || !password) return toast("Fill all fields.");
+  if (!useRemoteDb) {
+    await migratePasswordsToHash();
+    const exists = (auth.users || []).some((u) => normalizeUsername(u.username) === username);
+    if (exists) return toast("Username already exists.");
+    auth.users = Array.isArray(auth.users) ? auth.users : [];
+    auth.users.push({
+      id: uid("usr"),
+      username,
+      name,
+      role: "business_admin",
+      businessId,
+      disabled: false,
+      permissions: ROLE_PERMS.business_admin ?? [PERMS.USERS_MANAGE],
+      passwordHash: await hashPassword(username, password),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    auth.updatedAt = nowIso();
+    saveAuth(auth);
+    document.querySelector("#businessAdminForm")?.reset();
+    toast("Business admin created.");
+    return;
+  }
   const { ok, body } = await fetchPosApi("users.php", {
     method: "POST",
     body: JSON.stringify({
@@ -1029,22 +1517,44 @@ function renderBusinessesUi() {
   const tbody = document.querySelector("#businessesTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
-  for (const b of businessesCache || []) {
+  const list = useRemoteDb ? (businessesCache || []) : localBusinesses();
+  businessesCache = list;
+  for (const b0 of list) {
+    const b = { ...b0 };
     const tr = document.createElement("tr");
+    const status = b.disabled ? `<span class="pill pill--warn">DISABLED</span>` : `<span class="pill pill--ok">ACTIVE</span>`;
     tr.innerHTML = `
       <td><strong>${escapeHtml(b.name || "")}</strong></td>
       <td><span class="pill">${escapeHtml(b.id || "")}</span></td>
+      <td>${status}</td>
+      <td class="actions"></td>
     `;
+    const actions = tr.querySelector(".actions");
+    if (actions) {
+      const btnAdmins = mkBtn("Admins", "btn btn--table btn--table-primary btn--table-compact");
+      btnAdmins.addEventListener("click", () => openBusinessAdminsDialog(String(b.id || "")));
+
+      const btnEdit = mkBtn("Edit", "btn btn--table btn--table-primary btn--table-compact");
+      btnEdit.addEventListener("click", () => editBusinessLocal(String(b.id || "")));
+
+      const btnToggle = mkBtn(b.disabled ? "Enable" : "Disable", "btn btn--table btn--table-danger btn--table-compact");
+      btnToggle.addEventListener("click", () => toggleBusinessDisabledLocal(String(b.id || "")));
+
+      const btnDelete = mkBtn("Delete", "btn btn--table btn--table-danger btn--table-compact");
+      btnDelete.addEventListener("click", () => openDeleteBusinessDialog(String(b.id || "")));
+
+      actions.append(btnAdmins, btnEdit, btnToggle, btnDelete);
+    }
     tbody.appendChild(tr);
   }
   const sum = document.querySelector("#businessesSummary");
-  if (sum) sum.textContent = `${(businessesCache || []).length} business${(businessesCache || []).length === 1 ? "" : "es"}`;
+  if (sum) sum.textContent = `${list.length} business${list.length === 1 ? "" : "es"}`;
 
   const pick = document.querySelector("#businessPick");
   if (pick) {
     const keep = pick.value;
     pick.innerHTML = `<option value="">Select business</option>`;
-    for (const b of businessesCache || []) {
+    for (const b of list) {
       const opt = document.createElement("option");
       opt.value = b.id;
       opt.textContent = b.name || b.id;
@@ -1052,6 +1562,174 @@ function renderBusinessesUi() {
     }
     pick.value = keep;
   }
+}
+
+function editBusinessLocal(bizId) {
+  if (!isSuperAdmin()) return toast("Super Admin only.");
+  if (useRemoteDb) return toast("Edit business is not available in server mode yet.");
+  const id = String(bizId || "").trim();
+  if (!id) return;
+  const list = localBusinesses();
+  const b = list.find((x) => String(x.id) === id);
+  if (!b) return toast("Business not found.");
+  const next = prompt("Edit business name", b.name || "");
+  if (next == null) return;
+  const name = String(next || "").trim();
+  if (!name) return toast("Business name required.");
+  b.name = name;
+  auth.businesses = list;
+  auth.updatedAt = nowIso();
+  saveAuth(auth);
+  // keep business DB meta companyName in sync
+  const snap = loadDb(id);
+  if (snap) {
+    snap.meta = snap.meta || {};
+    snap.meta.companyName = name;
+    snap.meta.updatedAt = nowIso();
+    saveDb(snap, id);
+  }
+  renderBusinessesUi();
+  updateMainMenuAccount();
+  toast("Business updated.");
+}
+
+function toggleBusinessDisabledLocal(bizId) {
+  if (!isSuperAdmin()) return toast("Super Admin only.");
+  if (useRemoteDb) return toast("Disable/Enable business is not available in server mode yet.");
+  const id = String(bizId || "").trim();
+  if (!id) return;
+  const list = localBusinesses();
+  const b = list.find((x) => String(x.id) === id);
+  if (!b) return toast("Business not found.");
+  const next = !b.disabled;
+  if (!confirm(`${next ? "Disable" : "Enable"} business "${b.name || b.id}"?`)) return;
+  b.disabled = next;
+  auth.businesses = list;
+  auth.updatedAt = nowIso();
+  saveAuth(auth);
+  // If current active business gets disabled, fall back to default.
+  if (String(auth.session?.activeBusinessId || "") === id && next) {
+    auth.session.activeBusinessId = DEFAULT_BUSINESS_ID;
+    saveSession(auth.session);
+    db = ensureBusinessDbInitialized(DEFAULT_BUSINESS_ID);
+    renderAll();
+    renderInvoiceBranding();
+  }
+  renderBusinessesUi();
+  updateMainMenuAccount();
+  toast(next ? "Business disabled." : "Business enabled.");
+}
+
+function openBusinessAdminsDialog(bizId) {
+  if (!isSuperAdmin()) return toast("Super Admin only.");
+  const id = String(bizId || "").trim();
+  if (!id) return;
+  const dlg = document.querySelector("#businessAdminsDialog");
+  if (!dlg || typeof dlg.showModal !== "function") return;
+  const biz = (useRemoteDb ? (businessesCache || []) : localBusinesses()).find((b) => String(b.id) === id);
+  const title = document.querySelector("#businessAdminsDialogTitle");
+  const sub = document.querySelector("#businessAdminsDialogSub");
+  if (title) title.textContent = `Business admins · ${biz?.name || id}`;
+  if (sub) sub.textContent = `Business ID: ${id}`;
+
+  const tbody = document.querySelector("#businessAdminsTable tbody");
+  if (tbody) {
+    tbody.innerHTML = "";
+    const admins = (auth.users || []).filter((u) => String(u.role) === "business_admin" && String(u.businessId) === id);
+    if (!admins.length) {
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">No business admin accounts for this business.</td></tr>`;
+    } else {
+      for (const u of admins) {
+        const tr = document.createElement("tr");
+        const status = u.disabled ? `<span class="pill pill--warn">DISABLED</span>` : `<span class="pill pill--ok">ACTIVE</span>`;
+        tr.innerHTML = `
+          <td><span class="pill">${escapeHtml(u.username || "")}</span></td>
+          <td><strong>${escapeHtml(u.name || "")}</strong></td>
+          <td>${status}</td>
+          <td class="actions"></td>
+        `;
+        const actions = tr.querySelector(".actions");
+        const btnReset = mkBtn("Reset PW", "btn btn--table btn--table-primary btn--table-compact");
+        btnReset.addEventListener("click", () => resetUserPassword(u.id));
+        const btnToggle = mkBtn(u.disabled ? "Enable" : "Disable", "btn btn--table btn--table-danger btn--table-compact");
+        btnToggle.addEventListener("click", () => toggleUserDisabled(u.id));
+        actions?.append(btnReset, btnToggle);
+        tbody.appendChild(tr);
+      }
+    }
+  }
+  dlg.showModal();
+}
+
+let pendingDeleteBusinessId = null;
+
+function openDeleteBusinessDialog(bizId) {
+  if (!isSuperAdmin()) return toast("Super Admin only.");
+  if (useRemoteDb) return toast("Delete business is not available in server mode yet.");
+  const id = String(bizId || "").trim();
+  if (!id) return;
+  if (id === DEFAULT_BUSINESS_ID) return toast("Default Business cannot be deleted.");
+
+  pendingDeleteBusinessId = id;
+  const biz = localBusinesses().find((b) => String(b.id) === id);
+  const name = biz?.name || id;
+  const usersCount = (auth.users || []).filter((u) => String(u.businessId || "") === id).length;
+  const sum = document.querySelector("#deleteBusinessSummary");
+  if (sum) sum.textContent = `Business: ${name} (${id}) · Users: ${usersCount}`;
+  const uEl = document.querySelector("#deleteBizSuperUser");
+  const pEl = document.querySelector("#deleteBizSuperPass");
+  if (uEl) uEl.value = "";
+  if (pEl) pEl.value = "";
+  const dlg = document.querySelector("#deleteBusinessDialog");
+  if (dlg && typeof dlg.showModal === "function") dlg.showModal();
+  setTimeout(() => uEl?.focus(), 0);
+}
+
+function closeDeleteBusinessDialog() {
+  document.querySelector("#deleteBusinessDialog")?.close();
+  pendingDeleteBusinessId = null;
+}
+
+async function verifySuperadminCredentials(username, password) {
+  await migratePasswordsToHash();
+  const uname = normalizeUsername(username);
+  const pass = String(password || "");
+  const passHash = await hashPassword(uname, pass);
+  const su = (auth.users || []).find((u) => u.role === "superadmin" && normalizeUsername(u.username) === uname);
+  return !!(su && !su.disabled && su.passwordHash === passHash);
+}
+
+function deleteBusinessLocalNow(bizId) {
+  const id = String(bizId || "").trim();
+  if (!id || id === DEFAULT_BUSINESS_ID) return false;
+
+  // Remove business
+  auth.businesses = localBusinesses().filter((b) => String(b.id) !== id);
+  // Remove users belonging to this business (including business_admin and staff)
+  auth.users = (auth.users || []).filter((u) => String(u.businessId || "") !== id);
+  auth.updatedAt = nowIso();
+  saveAuth(auth);
+
+  // Remove business DB snapshot
+  try {
+    localStorage.removeItem(dbKeyForBusiness(id));
+  } catch {
+    /* ignore */
+  }
+
+  // If active business removed, fall back to default
+  if (String(auth.session?.activeBusinessId || "") === id) {
+    auth.session.activeBusinessId = DEFAULT_BUSINESS_ID;
+    saveSession(auth.session);
+    db = ensureBusinessDbInitialized(DEFAULT_BUSINESS_ID);
+  }
+
+  renderBusinessesUi();
+  updateMainMenuAccount();
+  renderAll();
+  renderInvoiceBranding();
+  toast("Business deleted.");
+  return true;
 }
 
 function normalizeBroker(b) {
@@ -2418,13 +3096,34 @@ async function createUserFromForm(e) {
   const name = ($("#newName").value || "").trim();
   const role = $("#newRole").value;
   const password = $("#newPassword").value;
+  const password2 = document.querySelector("#newPassword2")?.value || "";
+  const activeBiz = getActiveBusinessId();
+  const pickedPerms = getSelectedPermsFromUserForm();
 
   if (!username || !name || !role || !password) {
     toast("Please fill all user fields.");
     return;
   }
+  if (password !== password2) {
+    toast("Password and Confirm Password do not match.");
+    return;
+  }
+  if (!activeBiz) {
+    toast("Select an Active Business first.");
+    return;
+  }
+  if (String(currentUser()?.role) === "business_admin") {
+    if (role === "admin" || role === "superadmin" || role === "business_admin") {
+      toast("Business admin cannot create admin/superadmin.");
+      return;
+    }
+  }
   if (!ROLE_PERMS[role] && role !== "superadmin") {
     toast("Invalid role.");
+    return;
+  }
+  if (!pickedPerms.length) {
+    toast("Select at least one permission (or All).");
     return;
   }
   const exists = auth.users.some((u) => normalizeUsername(u.username) === username);
@@ -2445,8 +3144,8 @@ async function createUserFromForm(e) {
         name,
         role,
         password,
-        permissions: ROLE_PERMS[role] ?? [],
-        businessId: getActiveBusinessId(),
+        permissions: pickedPerms.includes("*") ? ["*"] : pickedPerms,
+        businessId: activeBiz,
       }),
     });
     if (!ok || !body || !body.ok) {
@@ -2467,7 +3166,8 @@ async function createUserFromForm(e) {
     username,
     name,
     role,
-    permissions: ROLE_PERMS[role] ?? [],
+    permissions: pickedPerms.includes("*") ? ["*"] : pickedPerms,
+    businessId: role === "superadmin" ? null : activeBiz,
     disabled: false,
     passwordHash: await hashPassword(username, password),
     createdAt: nowIso(),
@@ -2541,9 +3241,36 @@ async function resetUserPassword(userId) {
   toast("Password reset.");
 }
 
+async function deleteUser(userId) {
+  requirePerm("manage users", PERMS.USERS_MANAGE);
+  await migratePasswordsToHash();
+  const u = (auth.users || []).find((x) => x.id === userId);
+  if (!u) return;
+
+  const isSelf = currentUser()?.id && u.id === currentUser()?.id;
+  const isAdminUser = normalizeUsername(u.username) === "admin";
+  if (isSelf) return toast("Cannot delete your own user.");
+  if (isAdminUser) return toast('Cannot delete "admin" user.');
+
+  if (!confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
+
+  if (useRemoteDb) {
+    // Keep behavior safe if server endpoint differs.
+    // If you later confirm users.php supports DELETE, we can wire it.
+    toast("User delete is not enabled in server mode.");
+    return;
+  }
+
+  auth.users = (auth.users || []).filter((x) => x.id !== userId);
+  auth.updatedAt = nowIso();
+  saveAuth(auth);
+  renderUsers();
+  toast("User deleted.");
+}
+
 function persist() {
   db.meta.updatedAt = nowIso();
-  saveDb(db);
+  saveDb(db, getActiveBusinessId() || DEFAULT_BUSINESS_ID);
   if (USE_SUPABASE) {
     if (!auth.session?.user) return;
     const biz = getActiveBusinessId();
@@ -2633,6 +3360,7 @@ function setActiveTab(tab) {
 
 function canOpenNav(tab) {
   if (tab === "home") return true;
+  if (tab === "marketplace") return can(PERMS.INVENTORY_VIEW);
   if (tab === "inventory") return can(PERMS.INVENTORY_VIEW);
   if (tab === "inventoryReports") return can(PERMS.INVENTORY_VIEW);
   if (tab === "billing") return can(PERMS.BILLING_USE);
@@ -2653,6 +3381,229 @@ function canOpenNav(tab) {
   return false;
 }
 
+function marketplaceUrl({ vehicleId = "", businessId = "", absolute = false } = {}) {
+  const u = new URL(location.href);
+  u.searchParams.set("marketplace", "1");
+  if (vehicleId) u.searchParams.set("veh", String(vehicleId));
+  else u.searchParams.delete("veh");
+  if (businessId) u.searchParams.set("biz", String(businessId));
+  else u.searchParams.delete("biz");
+  if (!absolute) {
+    return `${u.pathname}${u.search}`;
+  }
+  return u.toString();
+}
+
+function marketplaceCompanyMetaLine() {
+  const addr = String(db.meta.companyAddress || "").trim();
+  const phone = String(db.meta.companyPhone || "").trim();
+  const phone2 = String(db.meta.companyPhone2 || "").trim();
+  const email = String(db.meta.companyEmail || "").trim();
+  const web = String(db.meta.companyWebsite || "").trim();
+  const phones = [phone, phone2].filter(Boolean).join(" / ");
+  return [addr, phones, email, web].filter(Boolean).join(" · ") || "—";
+}
+
+function marketplaceVehicleCandidates() {
+  return (Array.isArray(db.vehicles) ? db.vehicles : [])
+    .slice()
+    .filter((v) => String(v.status || "available") !== "sold")
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+}
+
+function setMarketplaceHeader() {
+  const name = String(db.meta.companyName || "").trim() || "E-Inventory";
+  const titleEl = document.querySelector("#marketCompanyName");
+  if (titleEl) titleEl.textContent = name;
+  const metaEl = document.querySelector("#marketCompanyMeta");
+  if (metaEl) metaEl.textContent = marketplaceCompanyMetaLine();
+  const mark = document.querySelector("#marketLogoMark");
+  if (mark) {
+    const parts = name.split(" ").filter(Boolean);
+    const letters = ((parts[0]?.[0] || "E") + (parts[1]?.[0] || "I")).toUpperCase();
+    mark.textContent = letters;
+  }
+}
+
+function renderMarketplaceList() {
+  setMarketplaceHeader();
+
+  const grid = document.querySelector("#marketGrid");
+  const sum = document.querySelector("#marketSummary");
+  const detail = document.querySelector("#marketVehicleDetail");
+  const backBtn = document.querySelector("#btnMarketplaceBack");
+  if (detail) detail.hidden = true;
+  if (backBtn) backBtn.hidden = true;
+  if (grid) grid.hidden = false;
+
+  const q = String(document.querySelector("#marketSearch")?.value || "").trim().toLowerCase();
+  const all = marketplaceVehicleCandidates();
+  const list = q
+    ? all.filter((v) => {
+        const hay = [
+          v.stockNo,
+          v.vehicleNumber,
+          v.make,
+          v.model,
+          v.year != null ? String(v.year) : "",
+          v.vehicleType,
+          v.color,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      })
+    : all;
+
+  const summary = document.querySelector("#marketSearchSummary");
+  if (summary) summary.textContent = q ? `${list.length} of ${all.length}` : `${all.length} available`;
+
+  if (!grid) return;
+  const placeholderSvg = (label = "Vehicle") =>
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#e2e8f0"/><stop offset="1" stop-color="#f8fafc"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="520" rx="24" fill="url(#g)"/>
+        <rect x="28" y="28" width="744" height="464" rx="20" fill="rgba(255,255,255,0.55)" stroke="rgba(148,163,184,0.35)"/>
+        <text x="50%" y="54%" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#334155">${escapeHtml(
+          label
+        )}</text>
+        <text x="50%" y="64%" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#64748b">No image uploaded</text>
+      </svg>`
+    )}`;
+
+  const cards = list
+    .map((v) => {
+      const title = vehicleLabel(v) || "Vehicle";
+      const img =
+        v.imageDataUrl && String(v.imageDataUrl).trim().startsWith("data:image/")
+          ? String(v.imageDataUrl).trim()
+          : placeholderSvg(title);
+      const price = formatMoney(v.sellPrice);
+      const bits = [v.make, v.model].filter(Boolean).join(" ");
+      const year = v.year != null && v.year !== "" ? String(v.year) : "—";
+      const stock = String(v.stockNo || "").trim() ? `Stock: ${escapeHtml(v.stockNo)}` : "";
+      const href = marketplaceUrl({ vehicleId: v.id, absolute: false });
+      return `
+        <article class="marketCard" data-market-veh="${escapeAttr(v.id)}" tabindex="0" role="link" aria-label="Open ${escapeAttr(title)}">
+          <div class="marketCard__imgWrap">
+            <img class="marketCard__img" src="${escapeAttr(img)}" alt="${escapeAttr(title)}" loading="lazy" />
+          </div>
+          <div class="marketCard__body">
+            <div class="marketCard__title">${escapeHtml(bits || title)}</div>
+            <div class="marketCard__sub muted">${escapeHtml(year)}${stock ? ` · ${stock}` : ""}</div>
+            <div class="marketCard__price">${escapeHtml(price)}</div>
+          </div>
+          <div class="marketCard__footer">
+            <a class="marketCard__link" href="${escapeAttr(href)}" data-market-open="${escapeAttr(v.id)}">View details</a>
+            <button class="btn btn--sm" type="button" data-market-copy="${escapeAttr(v.id)}">Copy link</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  grid.innerHTML = cards || `<div class="muted" style="padding: 18px">No available vehicles.</div>`;
+  if (sum) sum.textContent = `${list.length} vehicles`;
+}
+
+function renderMarketplaceVehicleDetail(vehicleId) {
+  setMarketplaceHeader();
+  const v = getVehicleById(String(vehicleId || "").trim());
+  const detail = document.querySelector("#marketVehicleDetail");
+  const grid = document.querySelector("#marketGrid");
+  const backBtn = document.querySelector("#btnMarketplaceBack");
+  if (!detail || !grid) return;
+
+  if (!v || String(v.status || "available") === "sold") {
+    detail.hidden = false;
+    grid.hidden = true;
+    if (backBtn) backBtn.hidden = false;
+    detail.innerHTML = `<div class="card"><div class="card__header"><h3>Not found</h3></div><div class="card__footer muted">This vehicle is no longer available.</div></div>`;
+    return;
+  }
+
+  const img =
+    v.imageDataUrl && String(v.imageDataUrl).trim().startsWith("data:image/")
+      ? String(v.imageDataUrl).trim()
+      : "";
+  const title = vehicleLabel(v) || `${String(v.make || "").trim()} ${String(v.model || "").trim()}`.trim() || "Vehicle";
+  const price = formatMoney(v.sellPrice);
+  const rows = [
+    ["Make", v.make || "—"],
+    ["Model", v.model || "—"],
+    ["Year", v.year != null && v.year !== "" ? String(v.year) : "—"],
+    ["Selling price", price],
+    ["Stock No.", v.stockNo || "—"],
+    ["Vehicle No.", v.vehicleNumber || "—"],
+    ["Type", v.vehicleType || "—"],
+    ["Colour", v.color || "—"],
+  ];
+
+  detail.hidden = false;
+  grid.hidden = true;
+  if (backBtn) backBtn.hidden = false;
+  detail.innerHTML = `
+    <div class="marketDetail card">
+      <div class="marketDetail__header">
+        <div>
+          <h3 style="margin:0">${escapeHtml(title)}</h3>
+          <div class="muted">${escapeHtml(v.stockNo || "")}${v.stockNo ? " · " : ""}${escapeHtml(String(v.vehicleNumber || ""))}</div>
+        </div>
+        <div class="marketDetail__actions">
+          <div class="marketDetail__price">${escapeHtml(price)}</div>
+          <button class="btn" type="button" data-market-copy="${escapeAttr(v.id)}">Copy link</button>
+        </div>
+      </div>
+      <div class="marketDetail__grid">
+        <div class="marketDetail__media">
+          ${
+            img
+              ? `<img class="marketDetail__img" src="${escapeAttr(img)}" alt="${escapeAttr(title)}" />`
+              : `<div class="marketDetail__imgPlaceholder muted">No image uploaded</div>`
+          }
+        </div>
+        <div class="marketDetail__spec">
+          <div class="marketSpec">
+            ${rows
+              .map(
+                ([k, val]) =>
+                  `<div class="marketSpec__row"><div class="marketSpec__k muted">${escapeHtml(k)}</div><div class="marketSpec__v">${escapeHtml(val)}</div></div>`
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+      ${
+        String(v.notes || "").trim()
+          ? `<div class="marketDetail__notes"><div class="muted" style="font-weight:700;margin-bottom:6px;">Notes</div><div>${escapeMultilineForHtml(
+              v.notes
+            )}</div></div>`
+          : ""
+      }
+      <div class="card__footer muted">
+        ${
+          !useRemoteDb
+            ? "Note: In local mode, shared links work only on this same device/browser. Use server mode to share publicly."
+            : "Share this link with customers to view this vehicle."
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderMarketplace() {
+  const params = new URLSearchParams(location.search);
+  const veh = String(params.get("veh") || "").trim();
+  if (veh) renderMarketplaceVehicleDetail(veh);
+  else renderMarketplaceList();
+}
+
 function initNav() {
   const mm = document.querySelector("#mainMenu");
   const go = (tab) => {
@@ -2662,6 +3613,7 @@ function initNav() {
       renderPurchaseVehicleBrokerOptions();
       renderPurchasePartyOptions();
     }
+    if (tab === "marketplace") renderMarketplace();
     if (tab === "dailyReport") renderDailyReport();
     if (mm?.open) mm.open = false;
   };
@@ -6098,7 +7050,11 @@ function salesOnCalendarDay(dayStr) {
 }
 
 function buildDailyReportPrintHtml(dayStr, parts) {
-  const companyLine = [db.meta.companyAddress, db.meta.companyPhone].filter(Boolean).join(" · ");
+  const phones = [db.meta.companyPhone, db.meta.companyPhone2]
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .join(" / ");
+  const companyLine = [db.meta.companyAddress, phones].filter(Boolean).join(" · ");
   const payRows = parts.payRowsHtml;
   const topRows = parts.topRowsHtml;
   const mixRows = parts.mixRowsHtml;
@@ -6889,9 +7845,12 @@ function renderDocsList() {
     node.querySelector(".docItem__sub").textContent = sub.join(" · ");
 
     const open = node.querySelector(".docItem__open");
-    open.href = doc.dataUrl || "#";
-    open.style.pointerEvents = doc.dataUrl ? "" : "none";
+    open.disabled = !doc.dataUrl;
     open.style.opacity = doc.dataUrl ? "1" : "0.5";
+    open.addEventListener("click", () => {
+      if (!doc.dataUrl) return;
+      openDocPreview(doc);
+    });
 
     const download = node.querySelector(".docItem__download");
     if (download) {
@@ -6913,6 +7872,45 @@ function renderDocsList() {
 
     host.appendChild(node);
   }
+}
+
+function openDocPreview(doc) {
+  const dlg = document.querySelector("#docPreviewDialog");
+  const body = document.querySelector("#docPreviewBody");
+  const title = document.querySelector("#docPreviewTitle");
+  const sub = document.querySelector("#docPreviewSub");
+  const openNew = document.querySelector("#docPreviewOpenNewTab");
+  if (!dlg || !body || !title || !sub || !openNew) return;
+
+  const name = String(doc?.name || "Document");
+  const type = String(doc?.type || "");
+  const size = doc?.size ? `${Math.round(doc.size / 1024)} KB` : "";
+  const addedAt = doc?.addedAt ? new Date(doc.addedAt).toLocaleString() : "";
+  title.textContent = name;
+  sub.textContent = [type, size, addedAt].filter(Boolean).join(" · ");
+
+  const dataUrl = String(doc?.dataUrl || "").trim();
+  openNew.href = dataUrl || "#";
+  openNew.style.pointerEvents = dataUrl ? "" : "none";
+  openNew.style.opacity = dataUrl ? "1" : "0.5";
+
+  if (!dataUrl) {
+    body.innerHTML = `<div class="muted">No preview available.</div>`;
+    dlg.showModal();
+    return;
+  }
+
+  const isPdf = type === "application/pdf" || name.toLowerCase().endsWith(".pdf") || dataUrl.startsWith("data:application/pdf");
+  const isImg = type.startsWith("image/") || dataUrl.startsWith("data:image/");
+  if (isPdf) {
+    body.innerHTML = `<iframe class="docPreview__frame" title="${escapeAttr(name)}" src="${escapeAttr(dataUrl)}"></iframe>`;
+  } else if (isImg) {
+    body.innerHTML = `<img class="docPreview__img" alt="${escapeAttr(name)}" src="${escapeAttr(dataUrl)}" />`;
+  } else {
+    body.innerHTML = `<div class="muted">Preview not supported for this file type.</div>`;
+  }
+
+  dlg.showModal();
 }
 
 async function addDocsFromFiles(fileList, label = "") {
@@ -7014,6 +8012,97 @@ function initEvents() {
   const loginUserEl = $("#loginUsername");
   if (USE_SUPABASE && loginUserEl) loginUserEl.type = "email";
 
+  // Marketplace
+  document.querySelector("#marketSearch")?.addEventListener("input", () => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("veh")) {
+      // if user is viewing a detail page and starts searching, go back to list
+      params.delete("veh");
+      history.replaceState({}, "", `${location.pathname}?${params.toString()}`);
+    }
+    renderMarketplaceList();
+  });
+  document.querySelector("#btnMarketplaceBack")?.addEventListener("click", () => {
+    const params = new URLSearchParams(location.search);
+    params.delete("veh");
+    params.set("marketplace", "1");
+    history.pushState({}, "", `${location.pathname}?${params.toString()}`);
+    renderMarketplaceList();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.querySelector("#btnMarketplaceCopyLink")?.addEventListener("click", async () => {
+    const link = marketplaceUrl({ absolute: true });
+    const ok = await copyText(link);
+    toast(ok ? "Marketplace link copied." : "Could not copy link.");
+  });
+  document.querySelector("#panel-marketplace")?.addEventListener("click", async (e) => {
+    const t = e.target;
+    const copyBtn = t?.closest?.("[data-market-copy]");
+    if (copyBtn) {
+      const id = String(copyBtn.getAttribute("data-market-copy") || "").trim();
+      const link = marketplaceUrl({ vehicleId: id, absolute: true });
+      const ok = await copyText(link);
+      toast(ok ? "Vehicle link copied." : "Could not copy link.");
+      return;
+    }
+    const openEl = t?.closest?.("[data-market-open]");
+    if (openEl) {
+      e.preventDefault();
+      const id = String(openEl.getAttribute("data-market-open") || "").trim();
+      const params = new URLSearchParams(location.search);
+      params.set("marketplace", "1");
+      params.set("veh", id);
+      history.pushState({}, "", `${location.pathname}?${params.toString()}`);
+      renderMarketplaceVehicleDetail(id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const card = t?.closest?.("[data-market-veh]");
+    if (card) {
+      const id = String(card.getAttribute("data-market-veh") || "").trim();
+      const params = new URLSearchParams(location.search);
+      params.set("marketplace", "1");
+      params.set("veh", id);
+      history.pushState({}, "", `${location.pathname}?${params.toString()}`);
+      renderMarketplaceVehicleDetail(id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+  });
+  document.querySelector("#panel-marketplace")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const card = e.target?.closest?.("[data-market-veh]");
+    if (!card) return;
+    const id = String(card.getAttribute("data-market-veh") || "").trim();
+    const params = new URLSearchParams(location.search);
+    params.set("marketplace", "1");
+    params.set("veh", id);
+    history.pushState({}, "", `${location.pathname}?${params.toString()}`);
+    renderMarketplaceVehicleDetail(id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  window.addEventListener("popstate", () => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("marketplace") === "1") {
+      setActiveTab("marketplace");
+      renderMarketplace();
+    }
+  });
+
+  // Company info explicit save (in addition to auto-save)
+  document.querySelector("#btnSaveCompanyInfo")?.addEventListener("click", () => {
+    requirePerm("save company info", PERMS.BRANDING_EDIT);
+    db.meta.companyName = String(document.querySelector("#companyName")?.value || "");
+    db.meta.companyAddress = String(document.querySelector("#companyAddress")?.value || "");
+    db.meta.companyPhone = String(document.querySelector("#companyPhone")?.value || "");
+    db.meta.companyPhone2 = String(document.querySelector("#companyPhone2")?.value || "");
+    db.meta.companyEmail = String(document.querySelector("#companyEmail")?.value || "");
+    db.meta.companyWebsite = String(document.querySelector("#companyWebsite")?.value || "");
+    persist();
+    renderInvoiceBranding();
+    toast("Company details saved.");
+  });
+
   const btnMenuLogin = document.querySelector("#btnMenuLogin");
   if (btnMenuLogin) {
     btnMenuLogin.addEventListener("click", () => {
@@ -7042,6 +8131,7 @@ function initEvents() {
       return;
     }
   });
+  document.querySelector("#setupForm")?.addEventListener("submit", runOneTimeSetupFromForm);
   const btnTouch = document.querySelector("#btnLoginTouchId");
   if (btnTouch) {
     btnTouch.addEventListener("click", () => {
@@ -7377,6 +8467,12 @@ function initEvents() {
     persist();
     renderInvoiceBranding();
   });
+  document.querySelector("#companyPhone2")?.addEventListener("input", () => {
+    requirePerm("change company info", PERMS.BRANDING_EDIT);
+    db.meta.companyPhone2 = String(document.querySelector("#companyPhone2")?.value || "");
+    persist();
+    renderInvoiceBranding();
+  });
   $("#companyEmail").addEventListener("input", () => {
     requirePerm("change company info", PERMS.BRANDING_EDIT);
     db.meta.companyEmail = $("#companyEmail").value || "";
@@ -7568,17 +8664,54 @@ function initEvents() {
       } catch {
         /* ignore */
       }
+      const role = document.querySelector("#newRole")?.value || "cashier";
+      renderUserPermsPicker(role === "admin" || role === "superadmin" ? ["*"] : ROLE_PERMS[role] ?? []);
       dlg.showModal();
       setTimeout(() => document.querySelector("#newUsername")?.focus(), 0);
     });
     document.querySelector("#btnCloseUserFormDialog")?.addEventListener("click", () => {
       document.querySelector("#userFormDialog")?.close();
     });
+    document.querySelector("#newRole")?.addEventListener("change", () => {
+      const role = document.querySelector("#newRole")?.value || "cashier";
+      renderUserPermsPicker(role === "admin" || role === "superadmin" ? ["*"] : ROLE_PERMS[role] ?? []);
+      const badge = document.querySelector("#userPermsSummary");
+      if (badge) badge.textContent = "Default by role";
+    });
   }
+
+  // edit user permissions
+  document.querySelector("#btnCloseEditUserPermsDialog")?.addEventListener("click", () => {
+    document.querySelector("#editUserPermsDialog")?.close();
+  });
+  document.querySelector("#btnCancelEditUserPerms")?.addEventListener("click", () => {
+    document.querySelector("#editUserPermsDialog")?.close();
+  });
+  document.querySelector("#editUserPermsForm")?.addEventListener("submit", saveEditUserPermsFromForm);
 
   // businesses (super admin)
   document.querySelector("#businessForm")?.addEventListener("submit", createBusinessFromForm);
   document.querySelector("#businessAdminForm")?.addEventListener("submit", createBusinessAdminFromForm);
+  const closeBizAdmins = () => document.querySelector("#businessAdminsDialog")?.close();
+  document.querySelector("#btnCloseBusinessAdminsDialog")?.addEventListener("click", closeBizAdmins);
+  document.querySelector("#btnBusinessAdminsCloseFooter")?.addEventListener("click", closeBizAdmins);
+  const closeDelBiz = () => closeDeleteBusinessDialog();
+  document.querySelector("#btnCloseDeleteBusinessDialog")?.addEventListener("click", closeDelBiz);
+  document.querySelector("#btnCancelDeleteBusiness")?.addEventListener("click", closeDelBiz);
+  document.querySelector("#deleteBusinessForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = pendingDeleteBusinessId;
+    if (!id) return;
+    const user = document.querySelector("#deleteBizSuperUser")?.value || "";
+    const pass = document.querySelector("#deleteBizSuperPass")?.value || "";
+    const ok = await verifySuperadminCredentials(user, pass);
+    if (!ok) return toast("Superadmin username/password incorrect.");
+    const biz = localBusinesses().find((b) => String(b.id) === String(id));
+    const name = biz?.name || id;
+    if (!confirm(`Delete business "${name}"? This cannot be undone.`)) return;
+    deleteBusinessLocalNow(id);
+    closeDeleteBusinessDialog();
+  });
 
   // brokers
   if (document.querySelector("#brokerForm")) {
@@ -8046,6 +9179,8 @@ function setCopyrightTexts() {
   if (homeCopyright) homeCopyright.textContent = text;
   const loginCopyright = document.querySelector("#loginCopyright");
   if (loginCopyright) loginCopyright.textContent = text;
+  const setupCopyright = document.querySelector("#setupCopyright");
+  if (setupCopyright) setupCopyright.textContent = text;
 }
 
 // Refused vehicles
@@ -8288,18 +9423,21 @@ function renderInvoiceBranding() {
   $("#companyName").value = db.meta.companyName || "";
   $("#companyAddress").value = db.meta.companyAddress || "";
   $("#companyPhone").value = db.meta.companyPhone || "";
+  const p2 = document.querySelector("#companyPhone2");
+  if (p2) p2.value = db.meta.companyPhone2 || "";
   $("#companyEmail").value = db.meta.companyEmail || "";
   $("#companyWebsite").value = db.meta.companyWebsite || "";
 
   // Build brand details in the order you requested:
-  // Address, then Phone, then Email, then Website.
+  // Address, then Phone(s), then Email, then Website.
   const addr = String(db.meta.companyAddress || "").trim();
   const phone = String(db.meta.companyPhone || "").trim();
+  const phone2 = String(db.meta.companyPhone2 || "").trim();
   const email = String(db.meta.companyEmail || "").trim();
   const website = String(db.meta.companyWebsite || "").trim();
   const detailsPieces = [
     addr || "—",
-    phone || "—",
+    [phone, phone2].filter(Boolean).join(" / ") || "—",
     email || "—",
     website || "—",
   ];
@@ -8413,9 +9551,10 @@ function exportSalesPdf() {
     .join("");
 
   const logoHtml = db.meta.invoiceLogoDataUrl
-    ? `<img src="${escapeAttr(db.meta.invoiceLogoDataUrl)}" style="width:54px;height:54px;object-fit:contain;border:1px solid #ddd;border-radius:10px;background:#f6f6f6;" />`
+    ? `<img src="${escapeAttr(db.meta.invoiceLogoDataUrl)}" style="width:100px;height:100px;object-fit:contain;border:1px solid #ddd;border-radius:14px;background:#f6f6f6;" />`
     : "";
-  const companyLine = [db.meta.companyAddress, db.meta.companyPhone, db.meta.companyEmail, db.meta.companyWebsite]
+  const phones = [db.meta.companyPhone, db.meta.companyPhone2].map((x) => String(x || "").trim()).filter(Boolean).join(" / ");
+  const companyLine = [db.meta.companyAddress, phones, db.meta.companyEmail, db.meta.companyWebsite]
     .map((x) => String(x || "").trim())
     .filter(Boolean)
     .join(" · ");
@@ -8488,6 +9627,7 @@ function renderAll() {
   renderSoldVehicleReports();
   renderInventoryReports();
   renderRefusedVehicles();
+  renderMarketplace();
   renderCart();
   renderQuotation();
   renderLedger();
@@ -8520,6 +9660,7 @@ async function bootstrap() {
   db.cart = db.cart || { items: [], discount: 0, extras: [] };
   db.cart.items = Array.isArray(db.cart.items) ? db.cart.items : [];
   db.cart.extras = Array.isArray(db.cart.extras) ? db.cart.extras : [];
+  if (typeof db.meta.initialSetupDone !== "boolean") db.meta.initialSetupDone = false;
   if (typeof db.meta.invoiceSentAuto !== "boolean") db.meta.invoiceSentAuto = false;
   if (!String(db.meta.invoiceSentTemplate || "").trim()) db.meta.invoiceSentTemplate = INVOICE_SENT_TEMPLATE;
   if (String(db.meta.invoiceSentTemplate || "").trim() === INVOICE_SENT_TEMPLATE_OLD) {
@@ -8558,6 +9699,19 @@ async function bootstrap() {
   setUserUi();
 
   // Always land on Home (so login isn't on a blank/empty screen)
+  // Refresh should always land on Home.
+  // If the URL had marketplace params, clear them to avoid "sticky" refresh state.
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get("marketplace") === "1" || params.get("veh")) {
+      params.delete("marketplace");
+      params.delete("veh");
+      const qs = params.toString();
+      history.replaceState({}, "", qs ? `${location.pathname}?${qs}` : location.pathname);
+    }
+  } catch {
+    // ignore
+  }
   setActiveTab("home");
 
   if (useRemoteDb && !sessionStorage.getItem("pos_mysql_ok")) {
@@ -8565,6 +9719,10 @@ async function bootstrap() {
     toast("Using MySQL server for data & login.");
   }
 
+  if (!db.meta.initialSetupDone) {
+    openSetup();
+    return;
+  }
   if (!currentUser()) openLogin();
 }
 
