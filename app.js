@@ -3755,6 +3755,9 @@ function normalizeVehicle(v) {
     docs: Array.isArray(v.docs) ? v.docs : [],
     imageDataUrl: typeof v.imageDataUrl === "string" ? v.imageDataUrl : "",
     extraItems: normalizeVehicleExtraItems(v.extraItems),
+    purchaseDate: String(v.purchaseDate ?? "")
+      .trim()
+      .slice(0, 10),
   };
 }
 
@@ -4361,6 +4364,15 @@ function fillVehicleForm(v) {
   $("#btnDeleteVehicle").hidden = !isAdmin();
 
   $("#stockNo").value = v.stockNo;
+  const pdEl = document.querySelector("#vehiclePurchaseDate");
+  if (pdEl) {
+    let pdt = String(v.purchaseDate ?? "").trim().slice(0, 10);
+    if (!pdt) {
+      const pr = purchaseRecordForInventoryVehicle(v);
+      if (pr?.purchaseDate) pdt = String(pr.purchaseDate).trim().slice(0, 10);
+    }
+    pdEl.value = pdt;
+  }
   $("#vin").value = v.vin ?? "";
   $("#make").value = v.make;
   $("#model").value = v.model;
@@ -4884,10 +4896,8 @@ function openInventoryViewDialog(vehicleId, { hideDocs } = {}) {
     ? ""
     : `<label class="field"><span class="muted">Docs</span><div><span class="pill">${docsCount} file${docsCount === 1 ? "" : "s"}</span></div></label>`;
 
-  const purchaseRec = purchaseRecordForInventoryVehicle(v);
-  const purchaseDateLine = purchaseRec?.purchaseDate
-    ? escapeHtml(String(purchaseRec.purchaseDate).trim())
-    : "—";
+  const purchaseDateRaw = vehiclePurchaseDateDisplay(v);
+  const purchaseDateLine = purchaseDateRaw ? escapeHtml(purchaseDateRaw) : "—";
 
   body.innerHTML = `
     <div class="formGrid" style="padding: 0">
@@ -5848,10 +5858,8 @@ function exportVehicleDetailsPdf(vehicleId) {
 
   const docsCount = Array.isArray(v.docs) ? v.docs.length : 0;
   const makeModel = `${String(v.make || "").trim()} ${String(v.model || "").trim()}`.trim();
-  const purchaseRecPdf = purchaseRecordForInventoryVehicle(v);
-  const purchaseDatePdf = purchaseRecPdf?.purchaseDate
-    ? escapeHtml(String(purchaseRecPdf.purchaseDate).trim())
-    : "—";
+  const purchaseDatePdfRaw = vehiclePurchaseDateDisplay(v);
+  const purchaseDatePdf = purchaseDatePdfRaw ? escapeHtml(purchaseDatePdfRaw) : "—";
 
   const afterSaleHtml = sale
     ? (() => {
@@ -6579,6 +6587,15 @@ function purchaseRecordForInventoryVehicle(v) {
   return null;
 }
 
+/** Vehicle field first, else linked purchase record (legacy / backfill). */
+function vehiclePurchaseDateDisplay(v) {
+  if (!v) return "";
+  const onV = String(v.purchaseDate ?? "").trim().slice(0, 10);
+  if (onV) return onV;
+  const p = purchaseRecordForInventoryVehicle(v);
+  return String(p?.purchaseDate ?? "").trim().slice(0, 10);
+}
+
 /** Purchase rows embed a vehicle snapshot; prefer live inventory so selling price / extras match Add Vehicle. */
 function vehicleForPurchaseListRow(p) {
   const snap = purchaseRecordVehicle(p);
@@ -6647,6 +6664,7 @@ function addPurchaseFromForm(e) {
     ownerType: document.querySelector("#purchaseOwnerType")?.value,
     ownerFirstName: document.querySelector("#purchaseOwnerFirstName")?.value,
     ownerSecondName: document.querySelector("#purchaseOwnerSecondName")?.value,
+    purchaseDate: document.querySelector("#purchaseDate")?.value || "",
     extraItems: collectVehicleExtraItemsFromForm(PURCHASE_EXTRA_ITEMS_LIST_SEL),
   };
 
@@ -6955,6 +6973,7 @@ async function upsertVehicleFromForm(e) {
     ownerType: document.querySelector("#ownerType")?.value,
     ownerFirstName: document.querySelector("#ownerFirstName")?.value,
     ownerSecondName: document.querySelector("#ownerSecondName")?.value,
+    purchaseDate: document.querySelector("#vehiclePurchaseDate")?.value || "",
     extraItems: collectVehicleExtraItemsFromForm(),
   };
 
