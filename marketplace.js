@@ -38,6 +38,11 @@
     return `${year}${v.make || ""} ${v.model || ""}`.trim();
   }
 
+  function marketplaceCopyrightText() {
+    const year = new Date().getFullYear();
+    return `© ${year} E-Inventory. All rights reserved.`;
+  }
+
   function companyMetaLine(c) {
     const addr = String(c.companyAddress || "").trim();
     const p1 = String(c.companyPhone || "").trim();
@@ -325,6 +330,9 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    const cr = $("#mpCopyright");
+    if (cr) cr.textContent = marketplaceCopyrightText();
+
     $("#mpBtnCopyLink")?.addEventListener("click", async () => {
       const ok = await copyText(marketplacePageUrl());
       toast(ok ? "Link copied." : "Could not copy link.");

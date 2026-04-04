@@ -142,6 +142,21 @@ if ($method === 'PUT') {
         }
     }
 
+    if (array_key_exists('permissions', $body)) {
+        $roleStmt = $pdo->prepare('SELECT role, username FROM pos_users WHERE id = ? LIMIT 1');
+        $roleStmt->execute([$id]);
+        $roleRow = $roleStmt->fetch(PDO::FETCH_ASSOC);
+        if ($roleRow) {
+            $r = (string) $roleRow['role'];
+            $permBody = $body['permissions'];
+            if ($r !== 'admin' && $r !== 'superadmin' && strtolower((string) $roleRow['username']) !== 'admin' && is_array($permBody)) {
+                $vals = array_values($permBody);
+                $permJson = json_encode($vals, JSON_UNESCAPED_UNICODE);
+                $pdo->prepare('UPDATE pos_users SET permissions = ? WHERE id = ?')->execute([$permJson, $id]);
+            }
+        }
+    }
+
     $stmt = $pdo->prepare('SELECT id, username, name, role, business_id, disabled, permissions, created_at FROM pos_users WHERE id = ?');
     $stmt->execute([$id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);

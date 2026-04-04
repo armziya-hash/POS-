@@ -1,4 +1,6 @@
 :root {
+  /* Approx. sticky header height for dashboard fill (desktop / mobile topbar differs) */
+  --app-chrome-height: 112px;
   --font: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
   --sans: var(--font);
@@ -75,6 +77,15 @@ p { margin: 6px 0 0; }
 .navItem--marketplace {
   position: relative;
 }
+.marketplacePage__copyright {
+  margin: 20px 0 0;
+  padding: 16px 12px 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+}
+
 .marketHero { overflow: hidden; position: relative; }
 .marketHero::before {
   content: "";
@@ -340,10 +351,10 @@ p { margin: 6px 0 0; }
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   padding: 12px 20px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px 20px;
 }
 
 .topbar::before {
@@ -358,6 +369,38 @@ p { margin: 6px 0 0; }
 }
 .topbar > * { position: relative; }
 
+.topbar__clock {
+  justify-self: center;
+  text-align: center;
+  min-width: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: var(--shadow-xs);
+}
+.topbarClock__date,
+.topbarClock__time {
+  display: block;
+}
+.topbarClock__date {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.topbarClock__time {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.2;
+}
 .topbar__right {
   display: flex;
   gap: 10px;
@@ -386,7 +429,13 @@ p { margin: 6px 0 0; }
   border-left: 1px solid rgba(148, 163, 184, 0.35);
 }
 
-.brand { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.brand {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  justify-self: start;
+}
 .brand__logo {
   width: 80px;
   height: 80px;
@@ -417,6 +466,7 @@ p { margin: 6px 0 0; }
 }
 
 .mainNav {
+  justify-self: end;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -781,6 +831,39 @@ details.menu[open] > summary.navItem::after {
 .panel { display: none; }
 .panel.is-active { display: block; }
 
+/* Dashboard: full viewport width + usable height below header */
+main.container:has(#panel-home.is-active) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+main.container:has(#panel-home.is-active) #panel-home {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--app-chrome-height));
+}
+main.container:has(#panel-home.is-active) .homeHero {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--app-chrome-height));
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+main.container:has(#panel-home.is-active) .homeHero__overlay {
+  flex: 1 1 auto;
+  min-height: calc(100dvh - var(--app-chrome-height));
+  place-items: stretch;
+  align-content: start;
+  padding: clamp(16px, 3vw, 36px);
+}
+main.container:has(#panel-home.is-active) .homeHero__card {
+  width: 100%;
+  max-width: none;
+}
+
 .homeHero {
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
@@ -820,18 +903,19 @@ details.menu[open] > summary.navItem::after {
   position: relative;
 }
 .homeHero__eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--primary);
-  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--ink-secondary);
+  margin-bottom: 8px;
 }
 .homeHero__title {
-  font-size: clamp(1.75rem, 3.7vw, 2.15rem);
+  font-size: clamp(1.65rem, 3.2vw, 2rem);
   font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  letter-spacing: -0.035em;
+  line-height: 1.22;
+  color: var(--ink);
 }
 .homeHero__subtitle {
   margin-top: 12px;
@@ -879,6 +963,43 @@ details.menu[open] > summary.navItem::after {
 
 .homeHero__quickSearchCard {
   margin-top: 20px;
+}
+
+.homeKpis {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.homeKpi {
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.55);
+  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(241,245,249,0.96));
+  padding: 10px 12px;
+  box-shadow: 0 10px 26px rgba(15,23,42,0.10);
+}
+.homeKpi__label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.homeKpi__value {
+  margin-top: 6px;
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.homeKpi__sub {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .homeKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .homeSearchPill {
@@ -962,15 +1083,25 @@ details.menu[open] > summary.navItem::after {
 
 /* Mobile + tablet ergonomics */
 @media (max-width: 760px) {
+  :root {
+    --app-chrome-height: 200px;
+  }
   .topbar {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+    justify-items: stretch;
     gap: 10px;
+  }
+  .topbar__clock {
+    justify-self: center;
+    max-width: 100%;
   }
   .brand { justify-content: space-between; }
   .topbar__right { justify-content: space-between; }
 
-  .mainNav { justify-content: flex-start; }
+  .mainNav {
+    justify-self: stretch;
+    justify-content: flex-start;
+  }
   .navItem { white-space: nowrap; }
   .homeQuickNav { grid-template-columns: 1fr 1fr; }
 
@@ -1017,10 +1148,18 @@ details.menu[open] > summary.navItem::after {
   .kpis { grid-template-columns: 1fr 1fr; }
   .homeHero__title { font-size: 22px; }
 
-  /* Avoid huge hero height on phones */
+  /* Avoid huge hero height on phones (dashboard full-screen overrides below) */
   .homeHero { min-height: auto; }
   .homeHero__overlay { min-height: auto; padding: 12px; }
   .homeHero__card { padding: 14px; }
+
+  main.container:has(#panel-home.is-active) .homeHero {
+    min-height: calc(100dvh - var(--app-chrome-height));
+  }
+  main.container:has(#panel-home.is-active) .homeHero__overlay {
+    min-height: calc(100dvh - var(--app-chrome-height));
+    padding: clamp(12px, 3vw, 20px);
+  }
 }
 
 @media (max-width: 420px) {
@@ -1394,6 +1533,17 @@ input::placeholder, textarea::placeholder { color: rgba(11, 18, 32, 0.35); }
   align-items: center;
 }
 
+/* Make action buttons compact, icon-sized */
+.table tbody td.actions .btn.btn--table {
+  padding: 6px;
+  min-width: auto;
+  border-radius: 999px;
+}
+.table tbody td.actions .btn.btn--table .menu__icon {
+  width: 16px;
+  height: 16px;
+}
+
 /* Inventory row actions — room for four equal controls */
 #inventoryTable th.actions,
 #inventoryTable td.actions {
@@ -1635,6 +1785,172 @@ input::placeholder, textarea::placeholder { color: rgba(11, 18, 32, 0.35); }
 .dialog__footer { padding: 12px 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
 
 .dialog__card--login { width: min(520px, calc(100vw - 24px)); }
+
+.dialog__card--vehicle.dialog__card--perms {
+  width: min(880px, calc(100vw - 24px));
+}
+
+/* User permission pickers (Create User / Edit Permissions) */
+.permPicker {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+.permPicker__lead {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 62ch;
+}
+.permPicker__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, var(--surface-subtle), rgba(255, 255, 255, 0.92));
+  border-bottom: 1px solid var(--border);
+}
+.permPicker__headTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.permPicker__headHint {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.45;
+  max-width: 44ch;
+}
+.permPicker__all {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.07), rgba(37, 99, 235, 0.02));
+}
+.permPicker__all:hover {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0.03));
+}
+.permPicker__all input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.permPicker__allText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.permPicker__allText strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+.permPicker__allText .muted {
+  font-size: 12px;
+  display: block;
+}
+.permPicker__groups {
+  padding: 12px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(48vh, 400px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.permPicker__group {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+}
+.permPicker__groups:has(.permPicker__group:only-child) .permPicker__group {
+  border-radius: var(--radius-lg);
+}
+.permPicker__groupTitle {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-secondary);
+  background: rgba(241, 245, 249, 0.85);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+.permPicker__items {
+  padding: 8px 10px 10px;
+  display: grid;
+  /* One column so every permission name stays fully visible (no clipped labels). */
+  grid-template-columns: 1fr;
+  gap: 4px 0;
+}
+.permPicker__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius2);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  min-width: 0;
+  width: 100%;
+}
+.permPicker__row:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+.permPicker__row input {
+  margin-top: 4px;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+.permPicker__row span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+/* “Grant all” disables row checkboxes but keeps labels fully readable */
+.permPicker__row input:disabled {
+  opacity: 0.65;
+}
+.permPicker__row input:disabled + span {
+  opacity: 1;
+  color: var(--ink);
+}
+
+.userPermsCell {
+  display: block;
+  max-width: min(340px, 50vw);
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.4;
+  vertical-align: bottom;
+  font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .permPicker__groups {
+    max-height: min(52vh, 360px);
+  }
+}
 
 /* Vehicle add/edit — compact scrollable window */
 .dialog--vehicle[open] {

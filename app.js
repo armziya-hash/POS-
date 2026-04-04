@@ -33,6 +33,19 @@ const DEFAULT_QUOTATION_TERMS = `1. This quotation is valid only until the "Vali
 6. Any deposit paid may be governed by a separate receipt and refund policy as applicable.`;
 
 const PERMS = {
+  // Module navigation permissions (used to show/hide tabs + menu items)
+  MARKETPLACE_VIEW: "marketplace.view",
+  PURCHASE_USE: "purchase.use",
+  SOLD_VEHICLE_VIEW: "sold_vehicle.view",
+  REFUSE_VEHICLE_VIEW: "refuse_vehicle.view",
+  INVENTORY_REPORTS_VIEW: "inventory_reports.view",
+  SALES_REPORTS_VIEW: "sales_reports.view",
+  DAILY_REPORTS_VIEW: "daily_reports.view",
+  GARAGE_USE: "garage.use",
+  QUOTATION_USE: "quotation.use",
+  CUSTOMER_USE: "customer.use",
+  SUPPLIERS_USE: "suppliers.use",
+  BROKERS_USE: "brokers.use",
   INVENTORY_VIEW: "inventory.view",
   INVENTORY_EDIT: "inventory.edit",
   INVENTORY_DELETE: "inventory.delete",
@@ -57,27 +70,114 @@ const PERMS = {
  * Remove lines here to hide options from the UI (RBAC still uses stored values).
  */
 const USER_PERMISSION_PICKER_KEYS = [
-  PERMS.INVENTORY_VIEW,
-  PERMS.INVENTORY_EDIT,
-  PERMS.INVENTORY_DELETE,
-  PERMS.DOCS_MANAGE,
-  PERMS.BILLING_USE,
-  PERMS.BILLING_SALE,
-  PERMS.BILLING_PRINT,
-  PERMS.LEDGER_VIEW,
-  PERMS.LEDGER_ADD,
-  PERMS.LEDGER_DELETE,
-  PERMS.REPORTS_VIEW,
-  PERMS.REPORTS_EXPORT,
-  PERMS.REPORTS_VOID,
-  PERMS.USERS_MANAGE,
-  PERMS.DATA_IMPORT_EXPORT,
-  PERMS.DATA_RESET,
-  PERMS.BRANDING_EDIT,
+  PERMS.INVENTORY_VIEW, // Inventory (includes Refuse vehicle & Marketplace in menu)
+  PERMS.PURCHASE_USE, // Purchase
+  PERMS.BILLING_USE, // Billing (includes Quotation in menu)
+  PERMS.LEDGER_VIEW, // Ledger
+  PERMS.SOLD_VEHICLE_VIEW, // Sold Vehicle
+  PERMS.REPORTS_VIEW, // Reports, Sales Reports & Daily Report submenu
+  PERMS.INVENTORY_REPORTS_VIEW, // Inventory Reports
+  PERMS.GARAGE_USE, // Garage (Customer menu uses Billing or Inventory access)
+  PERMS.SUPPLIERS_USE, // Supplier
+  PERMS.BRANDING_EDIT, // Company information
+  PERMS.USERS_MANAGE, // Users
 ];
 
 function userPermissionPickerKeys() {
   return USER_PERMISSION_PICKER_KEYS.slice();
+}
+
+/**
+ * One simple list in the UI (no sub-sections). Order matches the checklist shown to admins.
+ */
+const PERMISSION_GROUPS = [{ title: "", keys: [...USER_PERMISSION_PICKER_KEYS] }];
+
+function permissionSectionsForPicker(allowedKeys) {
+  const allowed = new Set(allowedKeys);
+  const sections = [];
+  for (const g of PERMISSION_GROUPS) {
+    const keys = g.keys.filter((k) => allowed.has(k));
+    if (keys.length) sections.push({ title: g.title, keys });
+  }
+  const used = new Set(sections.flatMap((s) => s.keys));
+  const leftover = [...allowed]
+    .filter((k) => !used.has(k))
+    .sort((a, b) => permLabel(a).localeCompare(permLabel(b)));
+  if (leftover.length) sections.push({ title: "Other", keys: leftover });
+  return sections;
+}
+
+/**
+ * If a user's saved permissions still use older granular keys, map them so the right checkboxes look ticked.
+ */
+const PICKER_GRANULAR_ALIASES = {
+  [PERMS.INVENTORY_VIEW]: [PERMS.INVENTORY_EDIT, PERMS.INVENTORY_DELETE, PERMS.DOCS_MANAGE],
+  [PERMS.BILLING_USE]: [PERMS.BILLING_SALE, PERMS.BILLING_PRINT],
+  [PERMS.LEDGER_VIEW]: [PERMS.LEDGER_ADD, PERMS.LEDGER_DELETE],
+  [PERMS.REPORTS_VIEW]: [PERMS.REPORTS_EXPORT, PERMS.REPORTS_VOID],
+  [PERMS.GARAGE_USE]: [PERMS.INVENTORY_VIEW, PERMS.INVENTORY_EDIT, PERMS.BILLING_USE],
+  [PERMS.INVENTORY_REPORTS_VIEW]: [PERMS.INVENTORY_VIEW],
+  [PERMS.SOLD_VEHICLE_VIEW]: [PERMS.REPORTS_VIEW],
+  // Legacy-only keys (no longer on picker) still tick the right boxes when editing old users
+  [PERMS.QUOTATION_USE]: [PERMS.BILLING_USE],
+  [PERMS.CUSTOMER_USE]: [PERMS.INVENTORY_VIEW, PERMS.INVENTORY_EDIT, PERMS.BILLING_USE],
+  [PERMS.SALES_REPORTS_VIEW]: [PERMS.REPORTS_VIEW, PERMS.REPORTS_EXPORT],
+  [PERMS.DAILY_REPORTS_VIEW]: [PERMS.REPORTS_VIEW],
+  [PERMS.REFUSE_VEHICLE_VIEW]: [PERMS.INVENTORY_VIEW],
+  [PERMS.MARKETPLACE_VIEW]: [PERMS.INVENTORY_VIEW],
+  [PERMS.BROKERS_USE]: [PERMS.PURCHASE_USE, PERMS.SUPPLIERS_USE],
+};
+
+function isPickerKeyChecked(pickerKey, rawPerms) {
+  const s = new Set(Array.isArray(rawPerms) ? rawPerms.filter(Boolean) : []);
+  if (s.has("*")) return true;
+  if (s.has(pickerKey)) return true;
+  const aliases = PICKER_GRANULAR_ALIASES[pickerKey];
+  if (aliases?.some((k) => s.has(k))) return true;
+  return false;
+}
+
+/**
+ * Turns what is stored on the user into the full set of technical permissions the app checks with can().
+ * Admins only tick simple screens; this fills in related actions behind the scenes.
+ */
+function expandStoredPermsForAccess(rawPerms) {
+  const out = new Set(Array.isArray(rawPerms) ? rawPerms.filter(Boolean) : []);
+  if (out.has("*")) {
+    return new Set(Object.values(PERMS));
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const add = (k) => {
+      if (k && !out.has(k)) {
+        out.add(k);
+        changed = true;
+      }
+    };
+    if (out.has(PERMS.INVENTORY_VIEW)) {
+      add(PERMS.INVENTORY_EDIT);
+      add(PERMS.INVENTORY_DELETE);
+      add(PERMS.DOCS_MANAGE);
+    }
+    if (out.has(PERMS.BILLING_USE)) {
+      add(PERMS.BILLING_SALE);
+      add(PERMS.BILLING_PRINT);
+    }
+    if (out.has(PERMS.LEDGER_VIEW)) {
+      add(PERMS.LEDGER_ADD);
+      add(PERMS.LEDGER_DELETE);
+    }
+    if (out.has(PERMS.REPORTS_VIEW)) {
+      add(PERMS.REPORTS_EXPORT);
+      add(PERMS.REPORTS_VOID);
+    }
+    if (out.has(PERMS.SOLD_VEHICLE_VIEW)) add(PERMS.SALES_REPORTS_VIEW);
+    if (out.has(PERMS.SALES_REPORTS_VIEW) || out.has(PERMS.DAILY_REPORTS_VIEW)) add(PERMS.REPORTS_VIEW);
+    if (out.has(PERMS.INVENTORY_REPORTS_VIEW) || out.has(PERMS.REFUSE_VEHICLE_VIEW)) add(PERMS.INVENTORY_VIEW);
+    if (out.has(PERMS.MARKETPLACE_VIEW)) add(PERMS.INVENTORY_VIEW);
+  }
+  return out;
 }
 
 const ROLE_PERMS = {
@@ -90,6 +190,9 @@ const ROLE_PERMS = {
     PERMS.BILLING_PRINT,
     PERMS.LEDGER_VIEW,
     PERMS.LEDGER_ADD,
+    PERMS.QUOTATION_USE,
+    PERMS.CUSTOMER_USE,
+    PERMS.MARKETPLACE_VIEW,
   ],
   supervisor: [
     PERMS.INVENTORY_VIEW,
@@ -102,6 +205,14 @@ const ROLE_PERMS = {
     PERMS.LEDGER_ADD,
     PERMS.REPORTS_VIEW,
     PERMS.REPORTS_EXPORT,
+    PERMS.INVENTORY_REPORTS_VIEW,
+    PERMS.SALES_REPORTS_VIEW,
+    PERMS.DAILY_REPORTS_VIEW,
+    PERMS.SOLD_VEHICLE_VIEW,
+    PERMS.REFUSE_VEHICLE_VIEW,
+    PERMS.QUOTATION_USE,
+    PERMS.CUSTOMER_USE,
+    PERMS.MARKETPLACE_VIEW,
   ],
   manager: [
     PERMS.INVENTORY_VIEW,
@@ -119,10 +230,48 @@ const ROLE_PERMS = {
     PERMS.REPORTS_VOID,
     PERMS.BRANDING_EDIT,
     PERMS.DATA_IMPORT_EXPORT,
+    PERMS.INVENTORY_REPORTS_VIEW,
+    PERMS.SALES_REPORTS_VIEW,
+    PERMS.DAILY_REPORTS_VIEW,
+    PERMS.SOLD_VEHICLE_VIEW,
+    PERMS.REFUSE_VEHICLE_VIEW,
+    PERMS.PURCHASE_USE,
+    PERMS.SUPPLIERS_USE,
+    PERMS.BROKERS_USE,
+    PERMS.GARAGE_USE,
+    PERMS.QUOTATION_USE,
+    PERMS.CUSTOMER_USE,
+    PERMS.MARKETPLACE_VIEW,
   ],
   admin: ["*"],
   superadmin: ["*"],
-  business_admin: [PERMS.USERS_MANAGE, PERMS.INVENTORY_VIEW, PERMS.INVENTORY_EDIT, PERMS.DOCS_MANAGE, PERMS.BILLING_USE, PERMS.BILLING_SALE, PERMS.BILLING_PRINT, PERMS.LEDGER_VIEW, PERMS.LEDGER_ADD, PERMS.REPORTS_VIEW, PERMS.REPORTS_EXPORT, PERMS.DATA_IMPORT_EXPORT, PERMS.BRANDING_EDIT],
+  business_admin: [
+    PERMS.USERS_MANAGE,
+    PERMS.INVENTORY_VIEW,
+    PERMS.INVENTORY_EDIT,
+    PERMS.DOCS_MANAGE,
+    PERMS.BILLING_USE,
+    PERMS.BILLING_SALE,
+    PERMS.BILLING_PRINT,
+    PERMS.LEDGER_VIEW,
+    PERMS.LEDGER_ADD,
+    PERMS.REPORTS_VIEW,
+    PERMS.REPORTS_EXPORT,
+    PERMS.DATA_IMPORT_EXPORT,
+    PERMS.BRANDING_EDIT,
+    PERMS.INVENTORY_REPORTS_VIEW,
+    PERMS.SALES_REPORTS_VIEW,
+    PERMS.DAILY_REPORTS_VIEW,
+    PERMS.SOLD_VEHICLE_VIEW,
+    PERMS.REFUSE_VEHICLE_VIEW,
+    PERMS.PURCHASE_USE,
+    PERMS.SUPPLIERS_USE,
+    PERMS.BROKERS_USE,
+    PERMS.GARAGE_USE,
+    PERMS.QUOTATION_USE,
+    PERMS.CUSTOMER_USE,
+    PERMS.MARKETPLACE_VIEW,
+  ],
 };
 
 function uid(prefix = "id") {
@@ -599,74 +748,130 @@ function allPermKeys() {
   return Object.values(PERMS);
 }
 
+function humanizePermKey(p) {
+  return String(p || "")
+    .trim()
+    .replaceAll(".", " · ")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function permLabel(p) {
   const map = {
-    [PERMS.INVENTORY_VIEW]: "Inventory: View",
+    [PERMS.MARKETPLACE_VIEW]: "Marketplace",
+    [PERMS.PURCHASE_USE]: "Purchase",
+    [PERMS.SOLD_VEHICLE_VIEW]: "Sold Vehicle",
+    [PERMS.REFUSE_VEHICLE_VIEW]: "Refuse vehicle",
+    [PERMS.INVENTORY_REPORTS_VIEW]: "Inventory Reports",
+    [PERMS.SALES_REPORTS_VIEW]: "Sales Reports",
+    [PERMS.DAILY_REPORTS_VIEW]: "Daily Reports",
+    [PERMS.GARAGE_USE]: "Garage",
+    [PERMS.QUOTATION_USE]: "Quotation",
+    [PERMS.CUSTOMER_USE]: "Customer",
+    [PERMS.SUPPLIERS_USE]: "Supplier",
+    [PERMS.BROKERS_USE]: "Broker",
+    [PERMS.INVENTORY_VIEW]: "Inventory",
     [PERMS.INVENTORY_EDIT]: "Inventory: Edit",
     [PERMS.INVENTORY_DELETE]: "Inventory: Delete",
     [PERMS.DOCS_MANAGE]: "Docs: Manage",
-    [PERMS.BILLING_USE]: "Billing: Use",
+    [PERMS.BILLING_USE]: "Billing",
     [PERMS.BILLING_SALE]: "Billing: Complete sale",
     [PERMS.BILLING_PRINT]: "Billing: Print",
-    [PERMS.LEDGER_VIEW]: "Ledger: View",
+    [PERMS.LEDGER_VIEW]: "Ledger",
     [PERMS.LEDGER_ADD]: "Ledger: Add",
     [PERMS.LEDGER_DELETE]: "Ledger: Delete",
-    [PERMS.REPORTS_VIEW]: "Reports: View",
+    [PERMS.REPORTS_VIEW]: "Reports",
     [PERMS.REPORTS_EXPORT]: "Reports: Export",
     [PERMS.REPORTS_VOID]: "Reports: Void",
-    [PERMS.USERS_MANAGE]: "Users: Manage",
+    [PERMS.USERS_MANAGE]: "Users",
     [PERMS.DATA_IMPORT_EXPORT]: "Data: Import/Export",
     [PERMS.DATA_RESET]: "Data: Reset",
-    [PERMS.BRANDING_EDIT]: "Branding: Edit",
+    [PERMS.BRANDING_EDIT]: "Company information",
   };
-  return map[p] || p;
+  return map[p] || humanizePermKey(p);
+}
+
+function summarizePermissionsForTable(permsArr) {
+  if (!permsArr || permsArr.includes("*")) {
+    return { label: "All access", title: "Full permissions — every module" };
+  }
+  const keys = permsArr.filter(Boolean);
+  if (!keys.length) return { label: "—", title: "" };
+  const pickable = new Set(userPermissionPickerKeys());
+  const preferred = keys.filter((k) => pickable.has(k));
+  const labels = (preferred.length ? preferred : keys).map((p) => permLabel(p));
+  if (labels.length <= 2) {
+    const label = labels.join(" · ");
+    return { label, title: label };
+  }
+  return { label: `${labels.length} permissions`, title: labels.join("\n") };
+}
+
+function renderGroupedPermPicker(grid, allCb, summary, selectedPerms, allowedKeys, idPrefix, summaryAll, summaryCustom) {
+  if (!grid) return;
+  const sel = Array.isArray(selectedPerms) ? selectedPerms : [];
+  const isAll = sel.includes("*");
+  if (allCb) allCb.checked = isAll;
+  grid.innerHTML = "";
+  const sections = permissionSectionsForPicker(allowedKeys);
+  for (const sec of sections) {
+    const groupEl = document.createElement("div");
+    groupEl.className = "permPicker__group";
+    if (String(sec.title || "").trim()) {
+      const titleEl = document.createElement("div");
+      titleEl.className = "permPicker__groupTitle";
+      titleEl.textContent = sec.title;
+      groupEl.appendChild(titleEl);
+    }
+    const itemsEl = document.createElement("div");
+    itemsEl.className = "permPicker__items";
+    for (const p of sec.keys) {
+      const id = `${idPrefix}_${p.replaceAll(".", "_")}`;
+      const wrap = document.createElement("label");
+      wrap.className = "permPicker__row";
+      wrap.innerHTML = `
+        <input type="checkbox" data-perm="${escapeAttr(p)}" id="${escapeAttr(id)}" />
+        <span>${escapeHtml(permLabel(p))}</span>
+      `;
+      const cb = wrap.querySelector("input");
+      if (cb) cb.checked = isAll || isPickerKeyChecked(p, sel);
+      itemsEl.appendChild(wrap);
+    }
+    groupEl.appendChild(itemsEl);
+    grid.appendChild(groupEl);
+  }
+  const updateDisabled = () => {
+    const isAllNow = !!allCb?.checked;
+    grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
+      el.disabled = isAllNow;
+    });
+    if (summary) summary.textContent = isAllNow ? summaryAll : summaryCustom;
+  };
+  if (allCb) allCb.onchange = () => updateDisabled();
+  grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
+    el.addEventListener("change", () => {
+      if (summary) summary.textContent = summaryCustom;
+      if (allCb) allCb.checked = false;
+      updateDisabled();
+    });
+  });
+  updateDisabled();
 }
 
 function renderUserPermsPicker(selectedPerms) {
   const grid = document.querySelector("#userPermsGrid");
   const allCb = document.querySelector("#permAll");
   const summary = document.querySelector("#userPermsSummary");
-  if (!grid) return;
-  const sel = Array.isArray(selectedPerms) ? selectedPerms : [];
-  const isAll = sel.includes("*");
-  if (allCb) allCb.checked = isAll;
-  grid.innerHTML = "";
-  const perms = allPermKeys().slice().sort((a, b) => permLabel(a).localeCompare(permLabel(b)));
-  for (const p of perms) {
-    const id = `perm_${p.replaceAll(".", "_")}`;
-    const wrap = document.createElement("label");
-    wrap.className = "row";
-    wrap.style.gap = "10px";
-    wrap.style.alignItems = "center";
-    wrap.style.margin = "0";
-    wrap.innerHTML = `
-      <input type="checkbox" data-perm="${escapeAttr(p)}" id="${escapeAttr(id)}" />
-      <span>${escapeHtml(permLabel(p))}</span>
-    `;
-    const cb = wrap.querySelector("input");
-    if (cb) cb.checked = isAll || sel.includes(p);
-    grid.appendChild(wrap);
-  }
-  const updateDisabled = () => {
-    const isAllNow = !!document.querySelector("#permAll")?.checked;
-    grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
-      el.disabled = isAllNow;
-    });
-    if (summary) {
-      summary.textContent = isAllNow ? "All permissions" : "Custom permissions";
-    }
-  };
-  if (allCb) {
-    allCb.onchange = () => updateDisabled();
-  }
-  grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
-    el.addEventListener("change", () => {
-      if (summary) summary.textContent = "Custom permissions";
-      if (allCb) allCb.checked = false;
-      updateDisabled();
-    });
-  });
-  updateDisabled();
+  renderGroupedPermPicker(
+    grid,
+    allCb,
+    summary,
+    selectedPerms,
+    userPermissionPickerKeys(),
+    "perm",
+    "All permissions",
+    "Custom permissions",
+  );
 }
 
 function getSelectedPermsFromUserForm() {
@@ -683,43 +888,16 @@ function renderEditUserPermsPicker(selectedPerms) {
   const grid = document.querySelector("#editUserPermsGrid");
   const allCb = document.querySelector("#editPermAll");
   const summary = document.querySelector("#editUserPermsSummary");
-  if (!grid) return;
-  const sel = Array.isArray(selectedPerms) ? selectedPerms : [];
-  const isAll = sel.includes("*");
-  if (allCb) allCb.checked = isAll;
-  grid.innerHTML = "";
-  const perms = userPermissionPickerKeys().sort((a, b) => permLabel(a).localeCompare(permLabel(b)));
-  for (const p of perms) {
-    const id = `edit_perm_${p.replaceAll(".", "_")}`;
-    const wrap = document.createElement("label");
-    wrap.className = "row";
-    wrap.style.gap = "10px";
-    wrap.style.alignItems = "center";
-    wrap.style.margin = "0";
-    wrap.innerHTML = `
-      <input type="checkbox" data-perm="${escapeAttr(p)}" id="${escapeAttr(id)}" />
-      <span>${escapeHtml(permLabel(p))}</span>
-    `;
-    const cb = wrap.querySelector("input");
-    if (cb) cb.checked = isAll || sel.includes(p);
-    grid.appendChild(wrap);
-  }
-  const updateDisabled = () => {
-    const isAllNow = !!document.querySelector("#editPermAll")?.checked;
-    grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
-      el.disabled = isAllNow;
-    });
-    if (summary) summary.textContent = isAllNow ? "All permissions" : "Custom";
-  };
-  if (allCb) allCb.onchange = () => updateDisabled();
-  grid.querySelectorAll("input[type=checkbox][data-perm]").forEach((el) => {
-    el.addEventListener("change", () => {
-      if (summary) summary.textContent = "Custom";
-      if (allCb) allCb.checked = false;
-      updateDisabled();
-    });
-  });
-  updateDisabled();
+  renderGroupedPermPicker(
+    grid,
+    allCb,
+    summary,
+    selectedPerms,
+    userPermissionPickerKeys(),
+    "edit_perm",
+    "All permissions",
+    "Custom permissions",
+  );
 }
 
 function getSelectedPermsFromEditDialog() {
@@ -762,15 +940,45 @@ async function saveEditUserPermsFromForm(e) {
   const isAdminUser = normalizeUsername(u.username) === "admin";
   if (isAdminUser) return toast('Cannot edit permissions for "admin".');
 
-  const prior = Array.isArray(u.permissions) ? u.permissions : rolePerms(u.role);
   const picked = getSelectedPermsFromEditDialog();
   if (!picked.length) return toast("Select at least one permission (or All).");
-  u.permissions = picked.includes("*") ? ["*"] : mergePermissionsWithPicker(prior, picked);
+  const nextPerms = picked.includes("*") ? ["*"] : picked;
+  u.permissions = nextPerms;
+
+  if (useRemoteDb) {
+    const { ok, body } = await fetchPosApi("users.php", {
+      method: "PUT",
+      body: JSON.stringify({ id: u.id, permissions: nextPerms }),
+    });
+    if (!ok || !body || !body.ok) {
+      toast(body?.error || "Could not save permissions on the server.");
+      return;
+    }
+    await refreshUsersFromServer();
+  }
+
   auth.updatedAt = nowIso();
   saveAuth(auth);
+
+  const synced = (auth.users || []).find((x) => String(x.id) === String(userId)) ?? u;
+  const sess = auth.session?.user;
+  if (sess && String(sess.id) === String(synced.id)) {
+    sess.permissions = sessionPermissionsFromUserRecord(synced);
+    saveSession(auth.session);
+    setUserUi();
+  }
+
   toast("Permissions updated.");
   document.querySelector("#editUserPermsDialog")?.close();
   renderUsers();
+}
+
+/** What goes on the session at login: saved custom list wins over role defaults. */
+function sessionPermissionsFromUserRecord(u) {
+  if (!u) return [];
+  if (u.role === "admin" || u.role === "superadmin") return ["*"];
+  if (Array.isArray(u.permissions) && u.permissions.length > 0) return u.permissions.slice();
+  return rolePerms(u.role).slice();
 }
 
 function can(perm) {
@@ -781,8 +989,11 @@ function can(perm) {
   // Prefer explicit permissions if present on session (created users), but
   // fall back to role mapping to support older saved users/sessions.
   const explicitPerms = Array.isArray(u.permissions) ? u.permissions : null;
-  const perms = explicitPerms ?? rolePerms(u.role);
-  return perms.includes("*") || perms.includes(perm);
+  const perms =
+    explicitPerms && explicitPerms.length > 0 ? explicitPerms : rolePerms(u.role);
+  if (perms.includes("*")) return true;
+  const effective = expandStoredPermsForAccess(perms);
+  return effective.has(perm);
 }
 
 function requirePerm(action, perm) {
@@ -975,17 +1186,23 @@ function setUserUi() {
   const allowNav = [
     "home",
     ...(can(PERMS.INVENTORY_VIEW) ? ["inventory"] : []),
-    ...(can(PERMS.INVENTORY_VIEW) ? ["inventoryReports"] : []),
+    ...(can(PERMS.INVENTORY_REPORTS_VIEW) ? ["inventoryReports"] : []),
     ...(can(PERMS.BILLING_USE) ? ["billing"] : []),
-    ...(can(PERMS.BILLING_USE) ? ["quotation"] : []),
+    ...(canOpenNav("quotation") ? ["quotation"] : []),
     ...(can(PERMS.LEDGER_VIEW) ? ["ledger"] : []),
-    ...(can(PERMS.REPORTS_VIEW) ? ["reports", "dailyReport", "soldVehicleReports"] : []),
-    ...(can(PERMS.INVENTORY_VIEW) ? ["refusedVehicles"] : []),
-    ...(canAccessGarageCustomer() ? ["garage", "customer"] : []),
+    ...(canOpenNav("reports") ? ["reports"] : []),
+    ...(canOpenNav("dailyReport") ? ["dailyReport"] : []),
+    ...(can(PERMS.SOLD_VEHICLE_VIEW) ? ["soldVehicleReports"] : []),
+    ...(canOpenNav("refusedVehicles") ? ["refusedVehicles"] : []),
+    ...(can(PERMS.GARAGE_USE) ? ["garage"] : []),
+    ...(canOpenNav("customer") ? ["customer"] : []),
     ...(can(PERMS.BRANDING_EDIT) ? ["companyInfo"] : []),
     ...(can(PERMS.USERS_MANAGE) ? ["users"] : []),
     ...(isSuperAdmin() ? ["businesses"] : []),
-    ...(isAdmin() ? ["brokers", "purchase", "suppliers"] : []),
+    ...(canOpenNav("brokers") ? ["brokers"] : []),
+    ...(can(PERMS.PURCHASE_USE) ? ["purchase"] : []),
+    ...(can(PERMS.SUPPLIERS_USE) ? ["suppliers"] : []),
+    ...(canOpenNav("marketplace") ? ["marketplace"] : []),
   ];
 
   document.querySelectorAll("[data-nav]").forEach((el) => {
@@ -1283,7 +1500,7 @@ async function login(username, password) {
         name: u.name,
         role: u.role,
         businessId: u.businessId ?? null,
-        permissions: Array.isArray(u.permissions) ? u.permissions : ROLE_PERMS[u.role] ?? [],
+        permissions: sessionPermissionsFromUserRecord(u),
       },
       loggedInAt: nowIso(),
     };
@@ -1320,7 +1537,7 @@ async function login(username, password) {
       name: u.name,
       role: u.role,
       businessId: u.role === "superadmin" ? null : (u.businessId || DEFAULT_BUSINESS_ID),
-      permissions: ROLE_PERMS[u.role] ?? u.permissions ?? [],
+      permissions: sessionPermissionsFromUserRecord(u),
     },
     loggedInAt: nowIso(),
     activeBusinessId: u.role === "superadmin" ? pickedBiz : (u.businessId || DEFAULT_BUSINESS_ID),
@@ -1393,13 +1610,13 @@ function renderUsers() {
     const status = u.disabled ? `<span class="pill pill--warn">DISABLED</span>` : `<span class="pill pill--ok">ACTIVE</span>`;
 
     const permsArr = u.role === "admin" ? ["*"] : Array.isArray(u.permissions) ? u.permissions : rolePerms(u.role);
-    const permsText = permsArr.includes("*") ? "All" : permsArr.join(", ");
+    const permsSummary = summarizePermissionsForTable(permsArr);
 
     tr.innerHTML = `
       <td><span class="pill">${escapeHtml(u.username)}</span></td>
       <td><strong>${escapeHtml(u.name || "")}</strong></td>
       <td>${escapeHtml(u.role || "")}</td>
-      <td>${escapeHtml(permsText)}</td>
+      <td><span class="userPermsCell" title="${escapeAttr(permsSummary.title)}">${escapeHtml(permsSummary.label)}</span></td>
       <td>${status}</td>
       <td class="actions"></td>
     `;
@@ -3360,24 +3577,30 @@ function setActiveTab(tab) {
 
 function canOpenNav(tab) {
   if (tab === "home") return true;
-  if (tab === "marketplace") return can(PERMS.INVENTORY_VIEW);
+  // Marketplace: Inventory access (standalone key removed from picker)
+  if (tab === "marketplace") return can(PERMS.MARKETPLACE_VIEW) || can(PERMS.INVENTORY_VIEW);
   if (tab === "inventory") return can(PERMS.INVENTORY_VIEW);
-  if (tab === "inventoryReports") return can(PERMS.INVENTORY_VIEW);
+  if (tab === "inventoryReports") return can(PERMS.INVENTORY_REPORTS_VIEW);
   if (tab === "billing") return can(PERMS.BILLING_USE);
-  if (tab === "quotation") return can(PERMS.BILLING_USE);
+  // Quotation: Billing (standalone Quotation permission removed from picker)
+  if (tab === "quotation") return can(PERMS.QUOTATION_USE) || can(PERMS.BILLING_USE);
   if (tab === "ledger") return can(PERMS.LEDGER_VIEW);
-  if (tab === "reports") return can(PERMS.REPORTS_VIEW);
-  if (tab === "dailyReport") return can(PERMS.REPORTS_VIEW);
-  if (tab === "soldVehicleReports") return can(PERMS.REPORTS_VIEW);
-  if (tab === "refusedVehicles") return can(PERMS.INVENTORY_VIEW);
+  // Sales & Daily reports: parent "Reports" permission (separate daily/sales keys removed from picker)
+  if (tab === "reports") return can(PERMS.SALES_REPORTS_VIEW) || can(PERMS.REPORTS_VIEW);
+  if (tab === "dailyReport") return can(PERMS.DAILY_REPORTS_VIEW) || can(PERMS.REPORTS_VIEW);
+  if (tab === "soldVehicleReports") return can(PERMS.SOLD_VEHICLE_VIEW);
+  // Refuse vehicle: Inventory (standalone removed from picker)
+  if (tab === "refusedVehicles") return can(PERMS.REFUSE_VEHICLE_VIEW) || can(PERMS.INVENTORY_VIEW);
   if (tab === "companyInfo") return can(PERMS.BRANDING_EDIT);
   if (tab === "users") return can(PERMS.USERS_MANAGE);
   if (tab === "businesses") return isSuperAdmin();
-  if (tab === "garage" || tab === "customer") return canAccessGarageCustomer();
-  // For now these are admin-only modules
-  if (tab === "brokers") return isAdmin();
-  if (tab === "suppliers") return isAdmin();
-  if (tab === "purchase") return isAdmin();
+  if (tab === "garage") return can(PERMS.GARAGE_USE);
+  // Customer: Billing or Inventory (standalone Customer permission removed from picker)
+  if (tab === "customer") return can(PERMS.CUSTOMER_USE) || canAccessGarageCustomer();
+  // Broker: admin-style modules (standalone Broker permission removed from picker)
+  if (tab === "brokers") return can(PERMS.BROKERS_USE) || isAdmin();
+  if (tab === "suppliers") return can(PERMS.SUPPLIERS_USE);
+  if (tab === "purchase") return can(PERMS.PURCHASE_USE);
   return false;
 }
 
@@ -4038,6 +4261,23 @@ function renderInventory() {
   }
 
   $("#inventorySummary").textContent = `${list.length} vehicle${list.length === 1 ? "" : "s"}`;
+}
+
+function renderHomeKpis() {
+  const inv = (db.vehicles || []).filter((v) => String(v.status || "available") !== "sold");
+  const sold = (db.vehicles || []).filter((v) => String(v.status || "available") === "sold");
+  const today = todayISODate();
+  const todaySales = (db.sales || []).filter((s) => String(s.createdAt || "").slice(0, 10) === today);
+  const suppliers = (db.suppliers || []).length;
+
+  const set = (sel, val) => {
+    const el = document.querySelector(sel);
+    if (el) el.textContent = String(val);
+  };
+  set("#homeKpiInventory", inv.length);
+  set("#homeKpiSold", sold.length);
+  set("#homeKpiTodaySales", todaySales.length);
+  set("#homeKpiSuppliers", suppliers);
 }
 
 function renderSoldVehicleReports() {
@@ -4971,7 +5211,25 @@ function mkBtn(text, className) {
   const b = document.createElement("button");
   b.type = "button";
   b.className = className;
-  b.textContent = text;
+  const label = String(text || "").trim();
+  const iconMap = {
+    Edit: "i-edit",
+    View: "i-view",
+    Delete: "i-trash",
+    Docs: "i-docs",
+    "Sold docs": "i-docs-sold",
+    "Add to cart": "i-cart",
+    Download: "i-download",
+    Void: "i-void",
+  };
+  const iconId = iconMap[label] || null;
+  if (iconId) {
+    b.innerHTML = `<svg class="menu__icon" aria-hidden="true"><use href="#${iconId}" /></svg>`;
+    b.setAttribute("aria-label", label);
+    b.title = label;
+  } else {
+    b.textContent = text;
+  }
   return b;
 }
 
@@ -6784,7 +7042,7 @@ function completeSale() {
   sendImmediateInvoiceMessage(sale);
   renderAll();
   toast("Sale completed.");
-  setActiveTab("reports");
+  setActiveTab(canOpenNav("reports") ? "reports" : "home");
   return saleId;
 }
 
@@ -9285,6 +9543,8 @@ function setCopyrightTexts() {
   if (loginCopyright) loginCopyright.textContent = text;
   const setupCopyright = document.querySelector("#setupCopyright");
   if (setupCopyright) setupCopyright.textContent = text;
+  const marketCopyright = document.querySelector("#marketCopyright");
+  if (marketCopyright) marketCopyright.textContent = text;
 }
 
 // Refused vehicles
@@ -9728,6 +9988,7 @@ function renderAll() {
   renderVehicleBrokerOptions();
   renderPurchaseVehicleBrokerOptions();
   renderInventory();
+  renderHomeKpis();
   renderSoldVehicleReports();
   renderInventoryReports();
   renderRefusedVehicles();
@@ -9746,6 +10007,38 @@ function renderAll() {
   renderInvoiceCustomerPick();
   renderInvoiceSentSettings();
   renderGarageJobs();
+}
+
+let topbarClockTimer = null;
+
+function updateTopbarClock() {
+  const dateEl = document.querySelector("#topbarDate");
+  const timeEl = document.querySelector("#topbarTime");
+  if (!dateEl || !timeEl) return;
+  const now = new Date();
+  const dateFmt = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+  const timeFmt = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: undefined,
+  });
+  dateEl.textContent = dateFmt.format(now);
+  timeEl.textContent = timeFmt.format(now);
+  const iso = now.toISOString();
+  dateEl.dateTime = iso.slice(0, 10);
+  timeEl.dateTime = iso.slice(0, 19);
+}
+
+function startTopbarClock() {
+  updateTopbarClock();
+  if (topbarClockTimer) clearInterval(topbarClockTimer);
+  topbarClockTimer = setInterval(updateTopbarClock, 1000);
 }
 
 async function bootstrap() {
@@ -9786,6 +10079,7 @@ async function bootstrap() {
 
   initNav();
   initEvents();
+  startTopbarClock();
   await refreshBusinessesFromServer();
   resetVehicleForm();
   updateLeaseSectionVisibility();
