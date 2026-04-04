@@ -59,6 +59,7 @@
             <button class="menu__item" type="button" data-nav="inventory"><svg class="menu__icon" aria-hidden="true"><use href="#i-inventory" /></svg>Inventory</button>
             <button class="menu__item" type="button" data-nav="purchase"><svg class="menu__icon" aria-hidden="true"><use href="#i-purchase" /></svg>Purchase</button>
             <button class="menu__item" type="button" data-nav="billing"><svg class="menu__icon" aria-hidden="true"><use href="#i-billing" /></svg>Billing</button>
+            <button class="menu__item" type="button" data-nav="invoices"><svg class="menu__icon" aria-hidden="true"><use href="#i-download" /></svg>Invoice</button>
             <button class="menu__item" type="button" data-nav="ledger"><svg class="menu__icon" aria-hidden="true"><use href="#i-ledger" /></svg>Ledger</button>
             <button class="menu__item" type="button" data-nav="soldVehicleReports"><svg class="menu__icon" aria-hidden="true"><use href="#i-car" /></svg>Sold Vehicle</button>
             <button class="menu__item" type="button" data-nav="refusedVehicles"><svg class="menu__icon" aria-hidden="true"><use href="#i-block" /></svg>Refuse vehicle</button>
@@ -242,7 +243,7 @@
                     <th>Model</th>
                     <th>Vehicle No</th>
                     <th>Garage status</th>
-                    <th class="num">Price</th>
+                    <th class="num">Selling price</th>
                     <th>Docs</th>
                     <th class="actions">Actions</th>
                   </tr>
@@ -446,29 +447,30 @@
                 <span>Remarks</span>
                 <textarea id="invoiceRemarks" rows="3" placeholder="optional"></textarea>
               </label>
-              <div class="field field--full">
-                <span>Documents (tick)</span>
-                <div class="formGrid" style="padding: 0; grid-template-columns: 1fr 1fr">
-                  <label class="field field--inline">
-                    <span>ORIGINAL CR</span>
+              <div class="field field--full billingDocField">
+                <span class="billingDocField__label">Documents (tick)</span>
+                <p class="billingDocField__hint muted">Tick each document supplied with this vehicle.</p>
+                <div class="billingDocGrid" role="group" aria-label="Invoice documents checklist">
+                  <label class="billingDocItem">
                     <input id="docOriginalCr" type="checkbox" />
+                    <span class="billingDocItem__text">Original CR</span>
                   </label>
-                  <label class="field field--inline">
-                    <span>NO OBJECTION LETTER</span>
+                  <label class="billingDocItem">
                     <input id="docNoObjection" type="checkbox" />
+                    <span class="billingDocItem__text">No objection letter</span>
                   </label>
-                  <label class="field field--inline">
-                    <span>DELETION</span>
+                  <label class="billingDocItem">
                     <input id="docDeletion" type="checkbox" />
+                    <span class="billingDocItem__text">Deletion</span>
                   </label>
-                  <label class="field field--inline">
-                    <span>REVENUE LICENCE</span>
+                  <label class="billingDocItem">
                     <input id="docRevenueLicence" type="checkbox" />
+                    <span class="billingDocItem__text">Revenue licence</span>
                   </label>
                 </div>
-                <label class="field field--full" style="margin-top: 10px">
-                  <span>OTHERS</span>
-                  <input id="docOthers" type="text" placeholder="Type other documents (optional)" />
+                <label class="field field--full billingDocOthers">
+                  <span>Other documents</span>
+                  <input id="docOthers" type="text" placeholder="Describe any other documents (optional)" />
                 </label>
               </div>
             </div>
@@ -531,15 +533,32 @@
 
                 <div class="invoiceDocs">
                   <div class="invoiceDocs__title">DOCUMENTS</div>
-                  <div class="invoiceLineGrid">
-                    <div>ORIGINAL CR: <span id="invDocOriginalCr">—</span></div>
-                    <div>NO OBJECTION LETTER: <span id="invDocNoObj">—</span></div>
+                  <div class="invoiceDocsMatrix" aria-label="Documents checklist">
+                    <div class="invoiceDocsMatrix__row">
+                      <div class="invoiceDocsMatrix__pair">
+                        <span class="invoiceDocsMatrix__k">Original CR</span>
+                        <span class="invoiceDocsMatrix__v" id="invDocOriginalCr">—</span>
+                      </div>
+                      <div class="invoiceDocsMatrix__pair">
+                        <span class="invoiceDocsMatrix__k">No objection letter</span>
+                        <span class="invoiceDocsMatrix__v" id="invDocNoObj">—</span>
+                      </div>
+                    </div>
+                    <div class="invoiceDocsMatrix__row">
+                      <div class="invoiceDocsMatrix__pair">
+                        <span class="invoiceDocsMatrix__k">Deletion</span>
+                        <span class="invoiceDocsMatrix__v" id="invDocDeletion">—</span>
+                      </div>
+                      <div class="invoiceDocsMatrix__pair">
+                        <span class="invoiceDocsMatrix__k">Revenue licence</span>
+                        <span class="invoiceDocsMatrix__v" id="invDocRevenue">—</span>
+                      </div>
+                    </div>
+                    <div class="invoiceDocsMatrix__row invoiceDocsMatrix__row--others">
+                      <span class="invoiceDocsMatrix__k">Others</span>
+                      <span class="invoiceDocsMatrix__v invoiceDocsMatrix__v--others" id="invDocOthers">—</span>
+                    </div>
                   </div>
-                  <div class="invoiceLineGrid">
-                    <div>DELETION: <span id="invDocDeletion">—</span></div>
-                    <div>REVENUE LICENCE: <span id="invDocRevenue">—</span></div>
-                  </div>
-                  <div class="invoiceLine">OTHERS: <span id="invDocOthers">—</span></div>
                 </div>
 
                 <div class="invoice__footer muted" id="invFooter">Thank you.</div>
@@ -571,6 +590,43 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-invoices" data-panel="invoices" role="tabpanel">
+        <div class="panel__header">
+          <div>
+            <h2>Invoice</h2>
+            <p class="muted">Find past vehicle sale invoices and open them in Billing or print / save as PDF.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__header" style="align-items: center; gap: 12px; flex-wrap: wrap">
+            <h3 style="margin: 0">Past invoices</h3>
+            <input
+              id="invoiceArchiveSearch"
+              class="input"
+              type="search"
+              placeholder="Search invoice no., customer, phone, stock, VIN…"
+              style="max-width: min(420px, 100%); margin-left: auto"
+            />
+          </div>
+          <div class="tableWrap">
+            <table class="table" id="invoicesArchiveTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Invoice no.</th>
+                  <th>Customer</th>
+                  <th>Payment</th>
+                  <th class="num">Total</th>
+                  <th class="actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card__footer muted" id="invoicesArchiveSummary">0 invoices</div>
         </div>
       </section>
 
@@ -1626,7 +1682,7 @@
                     <th>Stock</th>
                     <th>Vehicle</th>
                     <th class="num">Cost</th>
-                    <th class="num">Sell</th>
+                    <th class="num">Selling price</th>
                     <th class="actions">Actions</th>
                   </tr>
                 </thead>
@@ -2266,6 +2322,9 @@
               <label class="field">
                 <span>Selling price</span>
                 <input id="purchaseSellPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" />
+                <span class="muted" style="display: block; font-size: 12px; margin-top: 4px; font-weight: 400">
+                  Includes add-ons below; vehicle-only price is saved for stock.
+                </span>
               </label>
               <div class="field field--full">
                 <span>Vehicle image</span>
@@ -2278,6 +2337,14 @@
                 <div class="imgPreviewWrap" id="purchaseImagePreviewWrap" hidden>
                   <img id="purchaseImagePreview" alt="Purchase vehicle" />
                 </div>
+              </div>
+              <div class="field field--full" id="purchaseExtraItemsSection">
+                <span>Extra / add-on items</span>
+                <p class="muted" style="font-size: 13px; margin: 4px 0 8px">
+                  Optional accessories, warranty, delivery, etc. Saved on inventory and included when this vehicle is sold.
+                </p>
+                <div id="purchaseExtraItemsList" class="vehicleExtraItemsList"></div>
+                <button type="button" class="btn btn--ghost" id="btnAddPurchaseExtraItem">+ Add item</button>
               </div>
               <label class="field field--full">
                 <span>Notes</span>
@@ -2578,6 +2645,9 @@
               <label class="field">
                 <span>Selling Price</span>
                 <input id="sellPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required />
+                <span class="muted" style="display: block; font-size: 12px; margin-top: 4px; font-weight: 400">
+                  Includes add-ons below; vehicle-only price is saved for stock.
+                </span>
               </label>
               <div class="field field--full">
                 <span>Vehicle Image</span>
@@ -2590,6 +2660,14 @@
                 <div class="imgPreviewWrap" id="vehicleImagePreviewWrap" hidden>
                   <img id="vehicleImagePreview" alt="Vehicle" />
                 </div>
+              </div>
+              <div class="field field--full" id="vehicleExtraItemsSection">
+                <span>Extra / add-on items</span>
+                <p class="muted" style="font-size: 13px; margin: 4px 0 8px">
+                  Optional accessories, warranty, delivery, etc. Shown on the cart and invoice when this vehicle is sold.
+                </p>
+                <div id="vehicleExtraItemsList" class="vehicleExtraItemsList"></div>
+                <button type="button" class="btn btn--ghost" id="btnAddVehicleExtraItem">+ Add item</button>
               </div>
               <label class="field field--full">
                 <span>Notes</span>

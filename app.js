@@ -1187,7 +1187,7 @@ function setUserUi() {
     "home",
     ...(can(PERMS.INVENTORY_VIEW) ? ["inventory"] : []),
     ...(can(PERMS.INVENTORY_REPORTS_VIEW) ? ["inventoryReports"] : []),
-    ...(can(PERMS.BILLING_USE) ? ["billing"] : []),
+    ...(can(PERMS.BILLING_USE) ? ["billing", "invoices"] : []),
     ...(canOpenNav("quotation") ? ["quotation"] : []),
     ...(can(PERMS.LEDGER_VIEW) ? ["ledger"] : []),
     ...(canOpenNav("reports") ? ["reports"] : []),
@@ -3509,6 +3509,214 @@ function persist() {
   }, 450);
 }
 
+function normalizeVehicleExtraItems(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((ex) => {
+      const name = String(ex?.name ?? "").trim();
+      const qty = Math.max(1, safeNumber(ex?.qty, 1));
+      const price = Math.max(0, safeNumber(ex?.price, 0));
+      const id = String(ex?.id ?? "").trim() || uid("vex");
+      return { id, name, qty, price };
+    })
+    .filter((ex) => ex.name.length > 0);
+}
+
+function sumVehicleExtraItemsMoney(items) {
+  return normalizeVehicleExtraItems(items).reduce(
+    (s, ex) => s + safeNumber(ex.price, 0) * Math.max(1, safeNumber(ex.qty, 1)),
+    0
+  );
+}
+
+function sumVehicleExtraItemsMoneyFromForm(listSelector) {
+  return sumVehicleExtraItemsMoney(collectVehicleExtraItemsFromForm(listSelector));
+}
+
+/** Stored sellPrice (vehicle) + add-on line totals — matches cart / customer-facing total. */
+function vehicleSellingPriceTotal(v) {
+  if (!v) return 0;
+  return Math.max(0, safeNumber(v.sellPrice, 0)) + sumVehicleExtraItemsMoney(v.extraItems || []);
+}
+
+/** Extras on the sale invoice tied to this vehicle (vehicleId or legacy "STOCK · name" prefix). */
+function saleExtrasForVehicle(sale, vehicleId, stockNo) {
+  const list = Array.isArray(sale?.extras) ? sale.extras : [];
+  const vid = String(vehicleId || "").trim();
+  const sn = String(stockNo || "").trim();
+  return list.filter((ex) => {
+    if (!ex || typeof ex !== "object") return false;
+    if (vid && String(ex.vehicleId || "").trim() === vid) return true;
+    if (sn && String(ex.name || "").startsWith(`${sn} · `)) return true;
+    return false;
+  });
+}
+
+function saleExtraLineLabel(ex, stockNo) {
+  const n = String(ex?.name ?? "");
+  const prefix = `${String(stockNo || "").trim()} · `;
+  if (prefix.length > 3 && n.startsWith(prefix)) return n.slice(prefix.length).trim() || "Item";
+  return n.trim() || "Item";
+}
+
+const VEHICLE_EXTRA_ITEMS_LIST_SEL = "#vehicleExtraItemsList";
+const PURCHASE_EXTRA_ITEMS_LIST_SEL = "#purchaseExtraItemsList";
+
+function createVehicleExtraRow(item, listSelector = VEHICLE_EXTRA_ITEMS_LIST_SEL) {
+  const row = document.createElement("div");
+  row.className = "vehicleExtraItemRow row";
+  row.style.cssText = "gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;";
+  const ex = item && typeof item === "object" ? item : {};
+  const id = String(ex.id || "").trim() || uid("vex");
+  row.dataset.extraId = id;
+
+  const nameLab = document.createElement("label");
+  nameLab.className = "field";
+  nameLab.style.flex = "1";
+  nameLab.style.minWidth = "140px";
+  const nameSpan = document.createElement("span");
+  nameSpan.textContent = "Item name";
+  const nameIn = document.createElement("input");
+  nameIn.type = "text";
+  nameIn.className = "input vehicleExtraName";
+  nameIn.placeholder = "e.g. GPS, warranty";
+  nameIn.value = String(ex.name ?? "");
+  nameLab.append(nameSpan, nameIn);
+
+  const qtyLab = document.createElement("label");
+  qtyLab.className = "field";
+  qtyLab.style.width = "88px";
+  const qtySpan = document.createElement("span");
+  qtySpan.textContent = "Qty";
+  const qtyIn = document.createElement("input");
+  qtyIn.type = "number";
+  qtyIn.className = "input vehicleExtraQty";
+  qtyIn.min = "1";
+  qtyIn.step = "1";
+  qtyIn.value = String(Math.max(1, safeNumber(ex.qty, 1)));
+  qtyLab.append(qtySpan, qtyIn);
+
+  const priceLab = document.createElement("label");
+  priceLab.className = "field";
+  priceLab.style.width = "120px";
+  const priceSpan = document.createElement("span");
+  priceSpan.textContent = "Price each";
+  const priceIn = document.createElement("input");
+  priceIn.type = "number";
+  priceIn.className = "input vehicleExtraPrice";
+  priceIn.min = "0";
+  priceIn.step = "0.01";
+  priceIn.placeholder = "0";
+  if (ex.price != null && ex.price !== "") priceIn.value = String(ex.price);
+  priceLab.append(priceSpan, priceIn);
+
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "btn btn--danger btn--ghost vehicleExtraRemove";
+  rm.setAttribute("aria-label", "Remove");
+  rm.textContent = "Remove";
+  rm.addEventListener("click", () => {
+    row.remove();
+    ensureVehicleExtraItemsMinRow(listSelector);
+    if (listSelector === VEHICLE_EXTRA_ITEMS_LIST_SEL) syncVehicleFormSellPriceFromExtras();
+    else if (listSelector === PURCHASE_EXTRA_ITEMS_LIST_SEL) syncPurchaseFormSellPriceFromExtras();
+  });
+
+  row.append(nameLab, qtyLab, priceLab, rm);
+  return row;
+}
+
+function ensureVehicleExtraItemsMinRow(listSelector = VEHICLE_EXTRA_ITEMS_LIST_SEL) {
+  const list = document.querySelector(listSelector);
+  if (!list || list.children.length) return;
+  list.appendChild(createVehicleExtraRow({}, listSelector));
+}
+
+function renderVehicleExtraItemsForm(items, listSelector = VEHICLE_EXTRA_ITEMS_LIST_SEL) {
+  const list = document.querySelector(listSelector);
+  if (!list) return;
+  list.innerHTML = "";
+  const arr = normalizeVehicleExtraItems(items);
+  if (arr.length) {
+    for (const it of arr) list.appendChild(createVehicleExtraRow(it, listSelector));
+  } else {
+    list.appendChild(createVehicleExtraRow({}, listSelector));
+  }
+  if (listSelector === VEHICLE_EXTRA_ITEMS_LIST_SEL) syncVehicleFormSellPriceFromExtras();
+  else if (listSelector === PURCHASE_EXTRA_ITEMS_LIST_SEL) syncPurchaseFormSellPriceFromExtras();
+}
+
+function collectVehicleExtraItemsFromForm(listSelector = VEHICLE_EXTRA_ITEMS_LIST_SEL) {
+  const list = document.querySelector(listSelector);
+  if (!list) return [];
+  const out = [];
+  list.querySelectorAll(".vehicleExtraItemRow").forEach((row) => {
+    const name = row.querySelector(".vehicleExtraName")?.value?.trim() || "";
+    const qty = Math.max(1, safeNumber(row.querySelector(".vehicleExtraQty")?.value, 1));
+    const price = Math.max(0, safeNumber(row.querySelector(".vehicleExtraPrice")?.value, 0));
+    if (!name) return;
+    out.push({
+      id: row.dataset.extraId?.trim() || uid("vex"),
+      name,
+      qty,
+      price,
+    });
+  });
+  return normalizeVehicleExtraItems(out);
+}
+
+function syncVehicleFormSellPriceFromExtras() {
+  const form = document.querySelector("#vehicleForm");
+  const sellEl = document.querySelector("#sellPrice");
+  if (!form || !sellEl) return;
+  let base = safeNumber(form.dataset.vehicleSellBase, NaN);
+  if (Number.isNaN(base)) {
+    const ex = sumVehicleExtraItemsMoneyFromForm(VEHICLE_EXTRA_ITEMS_LIST_SEL);
+    base = Math.max(0, safeNumber(sellEl.value, 0) - ex);
+    form.dataset.vehicleSellBase = String(base);
+  }
+  const extrasTot = sumVehicleExtraItemsMoneyFromForm(VEHICLE_EXTRA_ITEMS_LIST_SEL);
+  const next = base + extrasTot;
+  if (document.activeElement !== sellEl) {
+    sellEl.value = next === 0 ? "" : String(next);
+  }
+}
+
+function commitVehicleFormSellPriceBase() {
+  const form = document.querySelector("#vehicleForm");
+  const sellEl = document.querySelector("#sellPrice");
+  if (!form || !sellEl) return;
+  const ex = sumVehicleExtraItemsMoneyFromForm(VEHICLE_EXTRA_ITEMS_LIST_SEL);
+  form.dataset.vehicleSellBase = String(Math.max(0, safeNumber(sellEl.value, 0) - ex));
+  syncVehicleFormSellPriceFromExtras();
+}
+
+function syncPurchaseFormSellPriceFromExtras() {
+  const form = document.querySelector("#purchaseForm");
+  const sellEl = document.querySelector("#purchaseSellPrice");
+  if (!form || !sellEl) return;
+  let base = safeNumber(form.dataset.purchaseSellBase, NaN);
+  if (Number.isNaN(base)) {
+    const ex = sumVehicleExtraItemsMoneyFromForm(PURCHASE_EXTRA_ITEMS_LIST_SEL);
+    base = Math.max(0, safeNumber(sellEl.value, 0) - ex);
+    form.dataset.purchaseSellBase = String(base);
+  }
+  const extrasTot = sumVehicleExtraItemsMoneyFromForm(PURCHASE_EXTRA_ITEMS_LIST_SEL);
+  const next = base + extrasTot;
+  if (document.activeElement !== sellEl) {
+    sellEl.value = next === 0 ? "" : String(next);
+  }
+}
+
+function commitPurchaseFormSellPriceBase() {
+  const form = document.querySelector("#purchaseForm");
+  const sellEl = document.querySelector("#purchaseSellPrice");
+  if (!form || !sellEl) return;
+  const ex = sumVehicleExtraItemsMoneyFromForm(PURCHASE_EXTRA_ITEMS_LIST_SEL);
+  form.dataset.purchaseSellBase = String(Math.max(0, safeNumber(sellEl.value, 0) - ex));
+  syncPurchaseFormSellPriceFromExtras();
+}
+
 function normalizeVehicle(v) {
   return {
     id: v.id ?? uid("veh"),
@@ -3546,6 +3754,7 @@ function normalizeVehicle(v) {
     saleId: v.saleId ?? null,
     docs: Array.isArray(v.docs) ? v.docs : [],
     imageDataUrl: typeof v.imageDataUrl === "string" ? v.imageDataUrl : "",
+    extraItems: normalizeVehicleExtraItems(v.extraItems),
   };
 }
 
@@ -3582,6 +3791,7 @@ function canOpenNav(tab) {
   if (tab === "inventory") return can(PERMS.INVENTORY_VIEW);
   if (tab === "inventoryReports") return can(PERMS.INVENTORY_REPORTS_VIEW);
   if (tab === "billing") return can(PERMS.BILLING_USE);
+  if (tab === "invoices") return can(PERMS.BILLING_USE);
   // Quotation: Billing (standalone Quotation permission removed from picker)
   if (tab === "quotation") return can(PERMS.QUOTATION_USE) || can(PERMS.BILLING_USE);
   if (tab === "ledger") return can(PERMS.LEDGER_VIEW);
@@ -3713,7 +3923,8 @@ function renderMarketplaceList() {
         v.imageDataUrl && String(v.imageDataUrl).trim().startsWith("data:image/")
           ? String(v.imageDataUrl).trim()
           : placeholderSvg(title);
-      const price = formatMoney(v.sellPrice);
+      const sellTotal = vehicleSellingPriceTotal(v);
+      const price = formatMoney(sellTotal);
       const bits = [v.make, v.model].filter(Boolean).join(" ");
       const year = v.year != null && v.year !== "" ? String(v.year) : "—";
       const stock = String(v.stockNo || "").trim() ? `Stock: ${escapeHtml(v.stockNo)}` : "";
@@ -3762,7 +3973,7 @@ function renderMarketplaceVehicleDetail(vehicleId) {
       ? String(v.imageDataUrl).trim()
       : "";
   const title = vehicleLabel(v) || `${String(v.make || "").trim()} ${String(v.model || "").trim()}`.trim() || "Vehicle";
-  const price = formatMoney(v.sellPrice);
+  const price = formatMoney(vehicleSellingPriceTotal(v));
   const rows = [
     ["Make", v.make || "—"],
     ["Model", v.model || "—"],
@@ -3849,6 +4060,7 @@ function initNav() {
       renderPurchaseVehicleBrokerOptions();
       renderPurchasePartyOptions();
     }
+    if (tab === "invoices") renderInvoicesArchive();
     if (tab === "dailyReport") renderDailyReport();
     if (mm?.open) mm.open = false;
   };
@@ -3904,7 +4116,7 @@ function setPurchaseFormDialogMode(isEdit) {
 }
 
 function fillPurchaseFormFromPurchase(p) {
-  const v = purchaseRecordVehicle(p);
+  const v = vehicleForPurchaseListRow(p);
   const setVal = (sel, val) => {
     const el = document.querySelector(sel);
     if (!el) return;
@@ -3949,7 +4161,6 @@ function fillPurchaseFormFromPurchase(p) {
   if (cond) cond.value = v.vehicleCondition || "";
   setVal("#purchaseEngineCc", v.engineCc != null && v.engineCc !== "" ? v.engineCc : "");
   setVal("#purchaseCostPrice", v.costPrice ?? "");
-  setVal("#purchaseSellPrice", v.sellPrice ?? "");
   setVal("#purchaseNotes", v.notes || "");
   const pls = document.querySelector("#purchaseLeasingStatus");
   if (pls) pls.value = v.leasingStatus || "No";
@@ -3962,6 +4173,10 @@ function fillPurchaseFormFromPurchase(p) {
   clearPurchaseImagePreview();
   const img = String(v.imageDataUrl || "").trim();
   if (img.startsWith("data:image/")) setPurchaseImagePreview(img);
+  const pf = document.querySelector("#purchaseForm");
+  if (pf) pf.dataset.purchaseSellBase = String(Math.max(0, safeNumber(v.sellPrice, 0)));
+  renderVehicleExtraItemsForm(v.extraItems || [], PURCHASE_EXTRA_ITEMS_LIST_SEL);
+  syncPurchaseFormSellPriceFromExtras();
   updatePurchaseLeaseSectionVisibility();
 }
 
@@ -3992,7 +4207,7 @@ function openPurchaseViewDialog(purchaseId) {
     toast("Purchase not found.");
     return;
   }
-  const v = purchaseRecordVehicle(p);
+  const v = vehicleForPurchaseListRow(p);
   const dlg = document.querySelector("#purchaseViewDialog");
   const body = document.querySelector("#purchaseViewBody");
   if (!dlg || !body) return;
@@ -4064,6 +4279,19 @@ function openPurchaseViewDialog(purchaseId) {
       <label class="field"><span class="muted">Engine CC</span><div>${v.engineCc != null ? escapeHtml(String(v.engineCc)) : "—"}</div></label>
       <label class="field"><span class="muted">Cost price</span><div>${escapeHtml(formatMoney(v.costPrice))}</div></label>
       <label class="field"><span class="muted">Selling price</span><div>${escapeHtml(formatMoney(v.sellPrice))}</div></label>
+      ${
+        normalizeVehicleExtraItems(v.extraItems).length
+          ? `<label class="field field--full"><span class="muted">Add-on items</span><div>${normalizeVehicleExtraItems(v.extraItems)
+              .map((ex) => {
+                const q = Math.max(1, safeNumber(ex.qty, 1));
+                const p = safeNumber(ex.price, 0);
+                return `<div>${escapeHtml(ex.name)} · Qty ${q} × ${escapeHtml(formatMoney(p))} = <strong>${escapeHtml(
+                  formatMoney(p * q)
+                )}</strong></div>`;
+              })
+              .join("")}</div></label>`
+          : ""
+      }
     </div>
     ${leaseBlock}
     <label class="field field--full" style="margin-top: 12px"><span class="muted">Notes</span><div style="white-space: pre-wrap">${escapeHtml(v.notes || "—")}</div></label>
@@ -4117,9 +4345,12 @@ function resetVehicleForm() {
   $("#vehicleFormModeBadge").textContent = "New";
   $("#btnDeleteVehicle").hidden = true;
   $("#vehicleForm").reset();
+  const vf = document.querySelector("#vehicleForm");
+  if (vf) delete vf.dataset.vehicleSellBase;
   renderVehicleBrokerOptions();
   $("#vehicleBrokerName").value = "Self";
   clearVehicleImagePreview();
+  renderVehicleExtraItemsForm([]);
   updateLeaseSectionVisibility();
 }
 
@@ -4152,7 +4383,6 @@ function fillVehicleForm(v) {
   updateLeaseSectionVisibility();
   $("#engineCc").value = v.engineCc ?? "";
   $("#costPrice").value = v.costPrice ?? 0;
-  $("#sellPrice").value = v.sellPrice ?? 0;
   $("#notes").value = v.notes ?? "";
   const ot = document.querySelector("#ownerType");
   if (ot) ot.value = v.ownerType ?? "";
@@ -4161,7 +4391,12 @@ function fillVehicleForm(v) {
   if (of) of.value = v.ownerFirstName ?? "";
   if (os) os.value = v.ownerSecondName ?? "";
 
+  const vf = document.querySelector("#vehicleForm");
+  if (vf) vf.dataset.vehicleSellBase = String(Math.max(0, safeNumber(v.sellPrice, 0)));
+
   setVehicleImagePreview(v.imageDataUrl || "");
+  renderVehicleExtraItemsForm(v.extraItems || []);
+  syncVehicleFormSellPriceFromExtras();
 }
 
 function inventoryMatchesQuery(v, q) {
@@ -4190,6 +4425,14 @@ function renderInventory() {
     const docsCount = Array.isArray(v.docs) ? v.docs.length : 0;
 
     const yearDisp = v.year != null && v.year !== "" ? escapeHtml(String(v.year)) : "—";
+    const sellTotal = vehicleSellingPriceTotal(v);
+    const extrasSum = sumVehicleExtraItemsMoney(v.extraItems || []);
+    const sellBreakdown =
+      extrasSum > 0
+        ? `<div class="muted" style="margin-top:4px;font-size:12px;">Vehicle ${escapeHtml(formatMoney(v.sellPrice))} + add-ons ${escapeHtml(
+            formatMoney(extrasSum)
+          )}</div>`
+        : "";
     tr.innerHTML = `
       <td>${v.imageDataUrl ? `<img class="thumb" alt="img" src="${escapeAttr(v.imageDataUrl)}" />` : `<div class="thumb thumb--empty">NO IMG</div>`}</td>
       <td><span class="pill">${escapeHtml(v.stockNo)}</span><div class="muted" style="margin-top:6px;font-family:var(--mono);font-size:12px;">${escapeHtml(v.vin || "—")}</div></td>
@@ -4198,7 +4441,9 @@ function renderInventory() {
       <td><strong>${escapeHtml(String(v.model || "").trim() || "—")}</strong></td>
       <td><strong>${escapeHtml(String(v.vehicleNumber || "").trim() || "—")}</strong></td>
       <td>${inventoryGarageStatusHtml(v)}</td>
-      <td class="num"><strong>${formatMoney(v.sellPrice)}</strong><div class="muted" style="margin-top:6px;">Cost: ${formatMoney(v.costPrice)}</div></td>
+      <td class="num"><strong>${escapeHtml(formatMoney(sellTotal))}</strong>${sellBreakdown}<div class="muted" style="margin-top:6px;">Cost: ${escapeHtml(
+        formatMoney(v.costPrice)
+      )}</div></td>
       <td><span class="pill">${docsCount} file${docsCount === 1 ? "" : "s"}</span></td>
       <td class="actions"></td>
     `;
@@ -4591,6 +4836,21 @@ function openInventoryViewDialog(vehicleId, { hideDocs } = {}) {
           .join(", ");
         const others = String(doc.others || "").trim();
         const docsText = [docLine, others ? `OTHERS: ${others}` : ""].filter(Boolean).join(" · ") || "—";
+        const vehExtras = saleExtrasForVehicle(sale, v.id, v.stockNo);
+        const extrasSoldHtml =
+          vehExtras.length > 0
+            ? `<label class="field field--full"><span class="muted">Add-on items (this sale)</span><div>${vehExtras
+                .map((ex) => {
+                  const qty = Math.max(1, safeNumber(ex.qty, 1));
+                  const unit = safeNumber(ex.price, 0);
+                  const line = safeNumber(ex.total, unit * qty);
+                  const label = saleExtraLineLabel(ex, v.stockNo);
+                  return `<div>${escapeHtml(label)} · Qty ${qty} × ${escapeHtml(formatMoney(unit))} = <strong>${escapeHtml(
+                    formatMoney(line)
+                  )}</strong></div>`;
+                })
+                .join("")}</div></label>`
+            : "";
 
         return `
           <div class="muted" style="margin: 16px 0 6px; font-weight: 800">After sale (Sale details)</div>
@@ -4602,6 +4862,7 @@ function openInventoryViewDialog(vehicleId, { hideDocs } = {}) {
             <label class="field"><span class="muted">Payment</span><div>${escapeHtml(paymentMethod)}</div></label>
             <label class="field"><span class="muted">Sold by</span><div>${escapeHtml(soldBy || "—")}</div></label>
             <label class="field"><span class="muted">Sold price</span><div><strong>${escapeHtml(formatMoney(soldPrice))}</strong></div></label>
+            ${extrasSoldHtml}
             <label class="field"><span class="muted">Invoice total</span><div>${escapeHtml(formatMoney(total))}</div></label>
             <label class="field"><span class="muted">Paid</span><div>${escapeHtml(formatMoney(paid))}</div></label>
             <label class="field"><span class="muted">Balance</span><div>${balance > 0 ? `<span class="pill pill--warn">${escapeHtml(formatMoney(balance))}</span>` : `<span class="pill pill--ok">0.00</span>`}</div></label>
@@ -4623,6 +4884,11 @@ function openInventoryViewDialog(vehicleId, { hideDocs } = {}) {
     ? ""
     : `<label class="field"><span class="muted">Docs</span><div><span class="pill">${docsCount} file${docsCount === 1 ? "" : "s"}</span></div></label>`;
 
+  const purchaseRec = purchaseRecordForInventoryVehicle(v);
+  const purchaseDateLine = purchaseRec?.purchaseDate
+    ? escapeHtml(String(purchaseRec.purchaseDate).trim())
+    : "—";
+
   body.innerHTML = `
     <div class="formGrid" style="padding: 0">
       <label class="field"><span class="muted">Stock No.</span><div><strong>${escapeHtml(v.stockNo || "—")}</strong></div></label>
@@ -4634,6 +4900,7 @@ function openInventoryViewDialog(vehicleId, { hideDocs } = {}) {
     ${ownerBlock}
     <div class="muted" style="margin: 12px 0 4px; font-weight: 800">Before sale (Vehicle details)</div>
     <div class="formGrid" style="padding: 0">
+      <label class="field"><span class="muted">Purchase date</span><div><strong>${purchaseDateLine}</strong></div></label>
       <label class="field"><span class="muted">Make</span><div>${escapeHtml(v.make || "—")}</div></label>
       <label class="field"><span class="muted">Model</span><div>${escapeHtml(v.model || "—")}</div></label>
       <label class="field"><span class="muted">Year</span><div>${v.year != null && v.year !== "" ? escapeHtml(String(v.year)) : "—"}</div></label>
@@ -4648,6 +4915,19 @@ function openInventoryViewDialog(vehicleId, { hideDocs } = {}) {
       <label class="field"><span class="muted">Engine CC</span><div>${v.engineCc != null ? escapeHtml(String(v.engineCc)) : "—"}</div></label>
       <label class="field"><span class="muted">Cost price</span><div>${escapeHtml(formatMoney(v.costPrice))}</div></label>
       <label class="field"><span class="muted">Selling price</span><div>${escapeHtml(formatMoney(v.sellPrice))}</div></label>
+      ${
+        normalizeVehicleExtraItems(v.extraItems).length
+          ? `<label class="field field--full"><span class="muted">Add-on items</span><div>${normalizeVehicleExtraItems(v.extraItems)
+              .map((ex) => {
+                const q = Math.max(1, safeNumber(ex.qty, 1));
+                const p = safeNumber(ex.price, 0);
+                return `<div>${escapeHtml(ex.name)} · Qty ${q} × ${escapeHtml(formatMoney(p))} = <strong>${escapeHtml(
+                  formatMoney(p * q)
+                )}</strong></div>`;
+              })
+              .join("")}</div></label>`
+          : ""
+      }
       ${docsRowHtml}
       <label class="field"><span class="muted">Vehicle ID</span><div><span class="pill">${escapeHtml(v.id || "—")}</span></div></label>
     </div>
@@ -5568,6 +5848,10 @@ function exportVehicleDetailsPdf(vehicleId) {
 
   const docsCount = Array.isArray(v.docs) ? v.docs.length : 0;
   const makeModel = `${String(v.make || "").trim()} ${String(v.model || "").trim()}`.trim();
+  const purchaseRecPdf = purchaseRecordForInventoryVehicle(v);
+  const purchaseDatePdf = purchaseRecPdf?.purchaseDate
+    ? escapeHtml(String(purchaseRecPdf.purchaseDate).trim())
+    : "—";
 
   const afterSaleHtml = sale
     ? (() => {
@@ -5593,6 +5877,21 @@ function exportVehicleDetailsPdf(vehicleId) {
           .join(", ");
         const others = String(doc.others || "").trim();
         const docsText = [docLine, others ? `OTHERS: ${others}` : ""].filter(Boolean).join(" · ") || "—";
+        const vehExtrasPdf = saleExtrasForVehicle(sale, v.id, v.stockNo);
+        const extrasRowsPdf =
+          vehExtrasPdf.length > 0
+            ? `<tr><th>Add-on items (this sale)</th><td>${vehExtrasPdf
+                .map((ex) => {
+                  const qty = Math.max(1, safeNumber(ex.qty, 1));
+                  const unit = safeNumber(ex.price, 0);
+                  const line = safeNumber(ex.total, unit * qty);
+                  const label = saleExtraLineLabel(ex, v.stockNo);
+                  return `${escapeHtml(label)} · Qty ${qty} × ${escapeHtml(formatMoney(unit))} = <strong>${escapeHtml(
+                    formatMoney(line)
+                  )}</strong>`;
+                })
+                .join("<br/>")}</td></tr>`
+            : "";
         return `
           <h2>After sale (Sale details)</h2>
           <table>
@@ -5603,6 +5902,7 @@ function exportVehicleDetailsPdf(vehicleId) {
             <tr><th>Payment</th><td>${escapeHtml(paymentMethod)}</td></tr>
             <tr><th>Sold by</th><td>${escapeHtml(soldBy || "—")}</td></tr>
             <tr><th>Sold price</th><td><strong>${escapeHtml(formatMoney(soldPrice))}</strong></td></tr>
+            ${extrasRowsPdf}
             <tr><th>Invoice total</th><td>${escapeHtml(formatMoney(total))}</td></tr>
             <tr><th>Paid</th><td>${escapeHtml(formatMoney(paid))}</td></tr>
             <tr><th>Balance</th><td>${escapeHtml(formatMoney(balance))}</td></tr>
@@ -5622,6 +5922,7 @@ function exportVehicleDetailsPdf(vehicleId) {
 
     <h2>Before sale (Vehicle details)</h2>
     <table>
+      <tr><th>Purchase date</th><td><strong>${purchaseDatePdf}</strong></td></tr>
       <tr><th>Stock No.</th><td><strong>${escapeHtml(v.stockNo || "—")}</strong></td></tr>
       <tr><th>Status</th><td>${escapeHtml(v.status || "—")}</td></tr>
       <tr><th>VIN / Chassis</th><td>${escapeHtml(v.vin || "—")}</td></tr>
@@ -6256,6 +6557,50 @@ function purchaseRecordVehicle(p) {
   });
 }
 
+/** Purchase row linked to this inventory vehicle (by vehicle id, else unique stock no). */
+function purchaseRecordForInventoryVehicle(v) {
+  if (!v) return null;
+  const vid = String(v.id || "").trim();
+  const sn = String(v.stockNo || "").trim().toLowerCase();
+  const list = Array.isArray(db.purchases) ? db.purchases : [];
+  if (vid) {
+    for (const p of list) {
+      const vv = purchaseRecordVehicle(p);
+      if (String(vv?.id || "").trim() === vid) return p;
+    }
+  }
+  if (sn) {
+    const matches = list.filter((p) => {
+      const vv = purchaseRecordVehicle(p);
+      return String(vv?.stockNo || "").trim().toLowerCase() === sn;
+    });
+    if (matches.length === 1) return matches[0];
+  }
+  return null;
+}
+
+/** Purchase rows embed a vehicle snapshot; prefer live inventory so selling price / extras match Add Vehicle. */
+function vehicleForPurchaseListRow(p) {
+  const snap = purchaseRecordVehicle(p);
+  const vid = String(snap?.id || "").trim();
+  if (vid) {
+    const live = getVehicleById(vid);
+    if (live) return live;
+  }
+  return normalizeVehicle(snap);
+}
+
+function syncPurchasesEmbeddedVehicle(invVehicle) {
+  const id = String(invVehicle?.id || "").trim();
+  if (!id) return;
+  for (const rec of Array.isArray(db.purchases) ? db.purchases : []) {
+    const pv = rec?.vehicle;
+    if (pv && typeof pv === "object" && String(pv.id || "").trim() === id) {
+      rec.vehicle = normalizeVehicle({ ...invVehicle });
+    }
+  }
+}
+
 function addPurchaseFromForm(e) {
   e.preventDefault();
   if (!isAdmin()) {
@@ -6291,11 +6636,18 @@ function addPurchaseFromForm(e) {
     leaseBalancePeriod: document.querySelector("#purchaseLeaseBalancePeriod")?.value,
     engineCc: document.querySelector("#purchaseEngineCc")?.value,
     costPrice: document.querySelector("#purchaseCostPrice")?.value,
-    sellPrice: document.querySelector("#purchaseSellPrice")?.value,
+    sellPrice: String(
+      Math.max(
+        0,
+        safeNumber(document.querySelector("#purchaseSellPrice")?.value, 0) -
+          sumVehicleExtraItemsMoneyFromForm(PURCHASE_EXTRA_ITEMS_LIST_SEL)
+      )
+    ),
     notes: document.querySelector("#purchaseNotes")?.value,
     ownerType: document.querySelector("#purchaseOwnerType")?.value,
     ownerFirstName: document.querySelector("#purchaseOwnerFirstName")?.value,
     ownerSecondName: document.querySelector("#purchaseOwnerSecondName")?.value,
+    extraItems: collectVehicleExtraItemsFromForm(PURCHASE_EXTRA_ITEMS_LIST_SEL),
   };
 
   if (editingPurchaseId) {
@@ -6377,11 +6729,14 @@ function resetPurchaseForm() {
   setPurchaseFormDialogMode(false);
   document.querySelector("#purchaseLeaseDialog")?.close();
   document.querySelector("#purchaseForm")?.reset();
+  const pf = document.querySelector("#purchaseForm");
+  if (pf) delete pf.dataset.purchaseSellBase;
   clearPurchaseImagePreview();
   const d = document.querySelector("#purchaseDate");
   if (d) d.value = todayISODate();
   renderPurchasePartyOptions();
   renderPurchaseVehicleBrokerOptions();
+  renderVehicleExtraItemsForm([], PURCHASE_EXTRA_ITEMS_LIST_SEL);
   updatePurchaseLeaseSectionVisibility();
 }
 
@@ -6436,7 +6791,7 @@ function renderPurchases() {
   const list = (Array.isArray(db.purchases) ? db.purchases : [])
     .filter((p) => {
       if (!q) return true;
-      const v = purchaseRecordVehicle(p);
+      const v = vehicleForPurchaseListRow(p);
       const hay = `${p.partyName ?? ""} ${p.source ?? ""} ${v.stockNo} ${v.vin} ${v.make} ${v.model} ${vehicleLabel(v)} ${v.gearSystem ?? ""} ${p.purchaseDate ?? ""} ${v.ownerType ?? ""} ${vehicleOwnerDisplayName(v)}`
         .toLowerCase();
       return hay.includes(q);
@@ -6444,12 +6799,20 @@ function renderPurchases() {
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
   for (const p of list) {
-    const v = purchaseRecordVehicle(p);
+    const v = vehicleForPurchaseListRow(p);
     const tr = document.createElement("tr");
     const owner = vehicleOwnerDisplayName(v);
     const typeLine =
       v.ownerType || owner
         ? `<div class="muted" style="margin-top:4px;font-size:12px;">${v.ownerType ? `${escapeHtml(v.ownerType)}${owner ? " · " : ""}` : ""}${owner ? `Owner: ${escapeHtml(owner)}` : ""}</div>`
+        : "";
+    const sellTotal = vehicleSellingPriceTotal(v);
+    const extrasSum = sumVehicleExtraItemsMoney(v.extraItems || []);
+    const sellBreakdown =
+      extrasSum > 0
+        ? `<div class="muted" style="margin-top:4px;font-size:12px;">Vehicle ${escapeHtml(formatMoney(v.sellPrice))} + add-ons ${escapeHtml(
+            formatMoney(extrasSum)
+          )}</div>`
         : "";
     tr.innerHTML = `
       <td>${escapeHtml(p.purchaseDate || "—")}</td>
@@ -6457,8 +6820,8 @@ function renderPurchases() {
       <td>${escapeHtml(p.partyName || "—")}</td>
       <td><span class="pill">${escapeHtml(v.stockNo || "—")}</span></td>
       <td><strong>${escapeHtml(vehicleLabel(v) || "—")}</strong>${typeLine}</td>
-      <td class="num">${formatMoney(v.costPrice)}</td>
-      <td class="num">${formatMoney(v.sellPrice)}</td>
+      <td class="num">${escapeHtml(formatMoney(v.costPrice))}</td>
+      <td class="num"><strong>${escapeHtml(formatMoney(sellTotal))}</strong>${sellBreakdown}</td>
       <td class="actions"></td>
     `;
     const actions = tr.querySelector(".actions");
@@ -6581,11 +6944,18 @@ async function upsertVehicleFromForm(e) {
     leaseBalancePeriod: $("#leaseBalancePeriod").value,
     engineCc: $("#engineCc").value,
     costPrice: $("#costPrice").value,
-    sellPrice: $("#sellPrice").value,
+    sellPrice: String(
+      Math.max(
+        0,
+        safeNumber($("#sellPrice").value, 0) -
+          sumVehicleExtraItemsMoneyFromForm(VEHICLE_EXTRA_ITEMS_LIST_SEL)
+      )
+    ),
     notes: $("#notes").value,
     ownerType: document.querySelector("#ownerType")?.value,
     ownerFirstName: document.querySelector("#ownerFirstName")?.value,
     ownerSecondName: document.querySelector("#ownerSecondName")?.value,
+    extraItems: collectVehicleExtraItemsFromForm(),
   };
 
   const normalized = normalizeVehicle(payload);
@@ -6613,10 +6983,12 @@ async function upsertVehicleFromForm(e) {
     if (pendingVehicleImageDataUrl) normalized.imageDataUrl = pendingVehicleImageDataUrl;
 
     db.vehicles[idx] = normalized;
+    syncPurchasesEmbeddedVehicle(normalized);
     toast("Vehicle updated.");
   } else {
     if (pendingVehicleImageDataUrl) normalized.imageDataUrl = pendingVehicleImageDataUrl;
     db.vehicles.push(normalized);
+    syncPurchasesEmbeddedVehicle(normalized);
     toast("Vehicle added.");
   }
   persist();
@@ -6684,7 +7056,17 @@ function cartTotals() {
     (s, it) => s + safeNumber(it.price, 0) * Math.max(1, safeNumber(it.qty, 1)),
     0
   );
-  const subtotal = items.reduce((sum, v) => sum + safeNumber(v.sellPrice, 0), 0) + extrasTotal;
+  const vehicleExtrasTotal = items.reduce(
+    (sum, v) =>
+      sum +
+      (Array.isArray(v.extraItems) ? v.extraItems : []).reduce(
+        (t, ex) => t + safeNumber(ex.price, 0) * Math.max(1, safeNumber(ex.qty, 1)),
+        0
+      ),
+    0
+  );
+  const subtotal =
+    items.reduce((sum, v) => sum + safeNumber(v.sellPrice, 0), 0) + vehicleExtrasTotal + extrasTotal;
   const discount = Math.min(safeNumber(db.cart.discount, 0), subtotal);
   const total = Math.max(0, subtotal - discount);
   return { items, extras: db.cart.extras, extrasTotal, subtotal, discount, total };
@@ -6708,10 +7090,30 @@ function renderCart() {
 
   for (const v of items) {
     const tr = document.createElement("tr");
+    const vex = normalizeVehicleExtraItems(v.extraItems);
+    const vexSum = vex.reduce(
+      (s, ex) => s + safeNumber(ex.price, 0) * Math.max(1, safeNumber(ex.qty, 1)),
+      0
+    );
+    const extrasLines = vex.length
+      ? vex
+          .map((ex) => {
+            const q = Math.max(1, safeNumber(ex.qty, 1));
+            const p = safeNumber(ex.price, 0);
+            return `${escapeHtml(ex.name)} ×${q} @ ${escapeHtml(formatMoney(p))}`;
+          })
+          .join(" · ")
+      : "";
     tr.innerHTML = `
       <td><span class="pill">${escapeHtml(v.stockNo)}</span></td>
-      <td><strong>${escapeHtml(vehicleLabel(v))}</strong><div class="muted" style="margin-top:6px;">${escapeHtml(v.vin || "—")}</div></td>
-      <td class="num"><strong>${formatMoney(v.sellPrice)}</strong></td>
+      <td><strong>${escapeHtml(vehicleLabel(v))}</strong><div class="muted" style="margin-top:6px;">${escapeHtml(v.vin || "—")}</div>${
+        extrasLines ? `<div class="muted" style="margin-top:6px;font-size:12px;">Add-ons: ${extrasLines}</div>` : ""
+      }</td>
+      <td class="num"><strong>${formatMoney(v.sellPrice)}</strong>${
+        vexSum > 0
+          ? `<div class="muted" style="margin-top:4px;font-size:12px;">+ ${escapeHtml(formatMoney(vexSum))} add-ons</div>`
+          : ""
+      }</td>
       <td class="actions"></td>
     `;
     const actions = tr.querySelector(".actions");
@@ -6822,6 +7224,20 @@ function renderInvoicePreview() {
       <td class="num">${formatMoney(v.sellPrice)}</td>
     `;
     tb.appendChild(tr);
+    for (const ex of normalizeVehicleExtraItems(v.extraItems)) {
+      const qty = Math.max(1, safeNumber(ex.qty, 1));
+      const price = safeNumber(ex.price, 0);
+      const trEx = document.createElement("tr");
+      trEx.innerHTML = `
+        <td>${escapeHtml(v.stockNo)}</td>
+        <td>
+          ${escapeHtml(ex.name)}
+          <div class="muted" style="margin-top:4px;">Add-on · Qty: ${escapeHtml(String(qty))}</div>
+        </td>
+        <td class="num">${formatMoney(price * qty)}</td>
+      `;
+      tb.appendChild(trEx);
+    }
   }
   for (const it of extras) {
     const qty = Math.max(1, safeNumber(it.qty, 1));
@@ -6934,13 +7350,29 @@ function completeSale() {
       gearSystem: v.gearSystem ?? "",
       sellPrice: safeNumber(v.sellPrice, 0),
     })),
-    extras: (extras || []).map((x) => ({
-      id: x.id,
-      name: x.name,
-      qty: Math.max(1, safeNumber(x.qty, 1)),
-      price: safeNumber(x.price, 0),
-      total: safeNumber(x.price, 0) * Math.max(1, safeNumber(x.qty, 1)),
-    })),
+    extras: [
+      ...items.flatMap((v) =>
+        normalizeVehicleExtraItems(v.extraItems).map((ex) => {
+          const qty = Math.max(1, safeNumber(ex.qty, 1));
+          const price = safeNumber(ex.price, 0);
+          return {
+            id: ex.id || uid("vex"),
+            name: `${v.stockNo} · ${ex.name}`,
+            qty,
+            price,
+            total: price * qty,
+            vehicleId: v.id,
+          };
+        })
+      ),
+      ...(extras || []).map((x) => ({
+        id: x.id,
+        name: x.name,
+        qty: Math.max(1, safeNumber(x.qty, 1)),
+        price: safeNumber(x.price, 0),
+        total: safeNumber(x.price, 0) * Math.max(1, safeNumber(x.qty, 1)),
+      })),
+    ],
     subtotal,
     discount,
     total,
@@ -7397,6 +7829,62 @@ function renderReports() {
   $("#salesSummary").textContent = `${list.length} sale${list.length === 1 ? "" : "s"}`;
 }
 
+function renderInvoicesArchive() {
+  const tbody = document.querySelector("#invoicesArchiveTable tbody");
+  const sumEl = document.querySelector("#invoicesArchiveSummary");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const q = (document.querySelector("#invoiceArchiveSearch")?.value || "").trim().toLowerCase();
+  const list = (Array.isArray(db.sales) ? db.sales : [])
+    .slice()
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .filter((s) => {
+      if (!q) return true;
+      const itemsHay = (s.items || [])
+        .map((it) => `${it.stockNo || ""} ${it.vin || ""} ${it.make || ""} ${it.model || ""} ${it.vehicleNumber || ""}`)
+        .join(" ");
+      const hay = `${s.invoiceNo || ""} ${s.customer?.name || ""} ${s.customer?.phone || ""} ${itemsHay}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  if (!list.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6" class="muted">${q ? "No invoices match your search." : "No completed sales / invoices yet."}</td>`;
+    tbody.appendChild(tr);
+  } else {
+  for (const s of list) {
+    const tr = document.createElement("tr");
+    const dateStr = s.createdAt ? new Date(s.createdAt).toLocaleString() : "—";
+    tr.innerHTML = `
+      <td>${escapeHtml(dateStr)}</td>
+      <td><span class="pill">${escapeHtml(s.invoiceNo || "—")}</span></td>
+      <td>${escapeHtml(s.customer?.name || "Walk-in")}</td>
+      <td>${escapeHtml(s.paymentMethod || "—")}</td>
+      <td class="num"><strong>${escapeHtml(formatMoney(s.total))}</strong></td>
+      <td class="actions"></td>
+    `;
+    const actions = tr.querySelector(".actions");
+    const btnBilling = mkBtn("Open in Billing", "btn btn--table btn--table-primary");
+    btnBilling.addEventListener("click", () => {
+      requirePerm("billing", PERMS.BILLING_USE);
+      viewSale(s.id);
+    });
+    const btnDl = mkBtn("Print / PDF", "btn btn--table btn--table-export");
+    if (!can(PERMS.BILLING_PRINT)) {
+      btnDl.disabled = true;
+      btnDl.classList.add("btn--table-muted");
+      btnDl.title = "No permission to print invoice";
+    } else {
+      btnDl.title = "Opens print dialog — choose Save as PDF or Microsoft Print to PDF";
+    }
+    btnDl.addEventListener("click", () => downloadInvoiceForSale(s.id));
+    actions.append(btnBilling, btnDl);
+    tbody.appendChild(tr);
+  }
+  }
+  if (sumEl) sumEl.textContent = `${list.length} invoice${list.length === 1 ? "" : "s"}`;
+}
+
 const DAILY_REPORT_PAYMENT_ORDER = ["Cash", "Bank", "Card", "E-Wallet", "Mixed"];
 
 let dailyReportTillSyncKey = "";
@@ -7787,13 +8275,12 @@ function printDailyReport() {
   w.document.close();
 }
 
-function viewSale(saleId) {
+function viewSale(saleId, { skipNavigate = false } = {}) {
   const s = db.sales.find((x) => x.id === saleId);
   if (!s) return;
 
-  setActiveTab("billing");
-  // ensure company info/logo is shown on invoice preview
   renderInvoiceBranding();
+  if (!skipNavigate) setActiveTab("billing");
   $("#invoiceNo").value = s.invoiceNo;
   $("#invoiceCustomerName").value = s.customer?.name || "";
   $("#invoiceCustomerPhone").value = s.customer?.phone || "";
@@ -7906,8 +8393,8 @@ function downloadInvoiceForSale(saleId) {
   const s = db.sales.find((x) => x.id === saleId);
   if (!s) return;
 
-  // Load invoice preview in the current app first (no DB changes).
-  viewSale(saleId);
+  // Fill hidden billing invoice preview (no tab switch) for clone → print / PDF.
+  viewSale(saleId, { skipNavigate: true });
 
   const invPreview = document.querySelector("#invoicePreview");
   if (!invPreview) {
@@ -8505,6 +8992,36 @@ function initEvents() {
   $("#vehicleForm").addEventListener("submit", upsertVehicleFromForm);
   $("#btnClearVehicleForm").addEventListener("click", resetVehicleForm);
   $("#btnDeleteVehicle").addEventListener("click", deleteVehicleFromForm);
+  document.querySelector("#btnAddVehicleExtraItem")?.addEventListener("click", () => {
+    document
+      .querySelector(VEHICLE_EXTRA_ITEMS_LIST_SEL)
+      ?.appendChild(createVehicleExtraRow({}, VEHICLE_EXTRA_ITEMS_LIST_SEL));
+    syncVehicleFormSellPriceFromExtras();
+  });
+  document.querySelector("#btnAddPurchaseExtraItem")?.addEventListener("click", () => {
+    document
+      .querySelector(PURCHASE_EXTRA_ITEMS_LIST_SEL)
+      ?.appendChild(createVehicleExtraRow({}, PURCHASE_EXTRA_ITEMS_LIST_SEL));
+    syncPurchaseFormSellPriceFromExtras();
+  });
+  document.querySelector("#vehicleForm")?.addEventListener("input", (e) => {
+    if (e.target?.closest?.(VEHICLE_EXTRA_ITEMS_LIST_SEL)) syncVehicleFormSellPriceFromExtras();
+  });
+  document.querySelector("#vehicleForm")?.addEventListener("change", (e) => {
+    if (e.target?.closest?.(VEHICLE_EXTRA_ITEMS_LIST_SEL)) syncVehicleFormSellPriceFromExtras();
+  });
+  document.querySelector("#sellPrice")?.addEventListener("blur", () => {
+    commitVehicleFormSellPriceBase();
+  });
+  document.querySelector("#purchaseForm")?.addEventListener("input", (e) => {
+    if (e.target?.closest?.(PURCHASE_EXTRA_ITEMS_LIST_SEL)) syncPurchaseFormSellPriceFromExtras();
+  });
+  document.querySelector("#purchaseForm")?.addEventListener("change", (e) => {
+    if (e.target?.closest?.(PURCHASE_EXTRA_ITEMS_LIST_SEL)) syncPurchaseFormSellPriceFromExtras();
+  });
+  document.querySelector("#purchaseSellPrice")?.addEventListener("blur", () => {
+    commitPurchaseFormSellPriceBase();
+  });
   document.querySelector("#btnAddNewVehicle")?.addEventListener("click", openVehicleFormDialogForNew);
   document.querySelector("#btnCloseVehicleFormDialog")?.addEventListener("click", () => {
     document.querySelector("#vehicleLeaseDialog")?.close();
@@ -8893,6 +9410,7 @@ function initEvents() {
   document.querySelector("#btnCloseLedgerEntryDialog")?.addEventListener("click", closeLedgerEntryDialog);
 
   $("#btnApplyReportFilter").addEventListener("click", renderReports);
+  document.querySelector("#invoiceArchiveSearch")?.addEventListener("input", renderInvoicesArchive);
   $("#btnClearReportFilter").addEventListener("click", () => {
     $("#reportFrom").value = "";
     $("#reportTo").value = "";
@@ -9997,6 +10515,7 @@ function renderAll() {
   renderQuotation();
   renderLedger();
   renderReports();
+  renderInvoicesArchive();
   renderDailyReport();
   renderUsers();
   renderBusinessesUi();

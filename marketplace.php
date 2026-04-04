@@ -93,6 +93,27 @@ foreach ($rawVehicles as $v) {
     if ($img !== '' && strpos($img, 'data:image/') !== 0) {
         $img = '';
     }
+    $extras = [];
+    if (isset($v['extraItems']) && is_array($v['extraItems'])) {
+        foreach ($v['extraItems'] as $ex) {
+            if (!is_array($ex)) {
+                continue;
+            }
+            $name = trim((string) ($ex['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $qty = isset($ex['qty']) && is_numeric($ex['qty']) ? (float) $ex['qty'] : 1.0;
+            if ($qty < 1) {
+                $qty = 1.0;
+            }
+            $ep = isset($ex['price']) && is_numeric($ex['price']) ? (float) $ex['price'] : 0.0;
+            if ($ep < 0) {
+                $ep = 0.0;
+            }
+            $extras[] = ['name' => $name, 'qty' => $qty, 'price' => $ep];
+        }
+    }
     $out[] = [
         'id' => (string) ($v['id'] ?? ''),
         'stockNo' => (string) ($v['stockNo'] ?? ''),
@@ -100,6 +121,7 @@ foreach ($rawVehicles as $v) {
         'model' => (string) ($v['model'] ?? ''),
         'year' => $v['year'] ?? null,
         'sellPrice' => is_numeric($v['sellPrice'] ?? null) ? (float) $v['sellPrice'] : 0.0,
+        'extraItems' => $extras,
         'vehicleNumber' => (string) ($v['vehicleNumber'] ?? ''),
         'vehicleType' => (string) ($v['vehicleType'] ?? ''),
         'color' => (string) ($v['color'] ?? ''),

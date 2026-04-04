@@ -33,6 +33,35 @@
     return x.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function safeNumber(n, fallback = 0) {
+    const x = Number(n);
+    return Number.isFinite(x) ? x : fallback;
+  }
+
+  function normalizeVehicleExtraItems(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((ex) => {
+        const name = String(ex?.name ?? "").trim();
+        const qty = Math.max(1, safeNumber(ex?.qty, 1));
+        const price = Math.max(0, safeNumber(ex?.price, 0));
+        return { name, qty, price };
+      })
+      .filter((ex) => ex.name.length > 0);
+  }
+
+  function sumVehicleExtraItemsMoney(items) {
+    return normalizeVehicleExtraItems(items).reduce(
+      (s, ex) => s + safeNumber(ex.price, 0) * Math.max(1, safeNumber(ex.qty, 1)),
+      0
+    );
+  }
+
+  function vehicleSellingPriceTotal(v) {
+    if (!v) return 0;
+    return Math.max(0, safeNumber(v.sellPrice, 0)) + sumVehicleExtraItemsMoney(v.extraItems || []);
+  }
+
   function vehicleLabel(v) {
     const year = v.year != null && v.year !== "" ? `${v.year} ` : "";
     return `${year}${v.make || ""} ${v.model || ""}`.trim();
@@ -146,7 +175,7 @@
           v.imageDataUrl && String(v.imageDataUrl).trim().startsWith("data:image/")
             ? String(v.imageDataUrl).trim()
             : placeholderSvg(title);
-        const price = formatMoney(v.sellPrice);
+        const price = formatMoney(vehicleSellingPriceTotal(v));
         const bits = [v.make, v.model].filter(Boolean).join(" ");
         const year = v.year != null && v.year !== "" ? String(v.year) : "—";
         const stock = String(v.stockNo || "").trim() ? `Stock: ${escapeHtml(v.stockNo)}` : "";
@@ -194,7 +223,7 @@
       v.imageDataUrl && String(v.imageDataUrl).trim().startsWith("data:image/")
         ? String(v.imageDataUrl).trim()
         : "";
-    const price = formatMoney(v.sellPrice);
+    const price = formatMoney(vehicleSellingPriceTotal(v));
     const rows = [
       ["Make", v.make || "—"],
       ["Model", v.model || "—"],
@@ -298,6 +327,7 @@
           model: String(v.model || ""),
           year: v.year,
           sellPrice: Number(v.sellPrice) || 0,
+          extraItems: Array.isArray(v.extraItems) ? v.extraItems : [],
           vehicleNumber: String(v.vehicleNumber || ""),
           vehicleType: String(v.vehicleType || ""),
           color: String(v.color || ""),
