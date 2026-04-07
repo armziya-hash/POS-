@@ -18,6 +18,29 @@ const sbClient = USE_SUPABASE && window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
+/**
+ * PHP API (MySQL). Same origin as the app: `/api/*.php`.
+ * Optional: before loading app.js, set `window.POS_API_BASE` (e.g. other subdomain) and `window.POS_API_KEY`.
+ * `file://` pages cannot fetch relative `api/` URLs; use http://localhost (e.g. php -S) unless POS_API_BASE is an absolute http(s) URL (CORS may still block from null origin).
+ */
+const IS_FILE_ORIGIN = typeof location !== "undefined" && location.protocol === "file:";
+const POS_API_BASE = (() => {
+  const fromWindow =
+    typeof window !== "undefined" && typeof window.POS_API_BASE === "string" && String(window.POS_API_BASE).trim()
+      ? String(window.POS_API_BASE).trim().replace(/\/$/, "")
+      : "";
+  if (fromWindow) return fromWindow;
+  if (IS_FILE_ORIGIN) return "";
+  if (typeof location === "undefined") return "";
+  try {
+    return new URL("api/", location.href).href.replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+})();
+const POS_API_KEY =
+  typeof window !== "undefined" && typeof window.POS_API_KEY === "string" ? window.POS_API_KEY : "";
+
 /** Set on failed `login()` so the form can show Supabase (or other) details. */
 let lastLoginError = "";
 /** When set, invoice preview shows a loaded sale; form edits sync without rebuilding from cart lines. */
@@ -661,6 +684,9 @@ function switchActiveBusinessLocal(bizId) {
 
 async function fetchPosApi(path, options = {}) {
   const base = POS_API_BASE.replace(/\/?$/, "");
+  if (!base) {
+    return { res: { ok: false, status: 0 }, ok: false, body: null };
+  }
   const p = path.replace(/^\//, "");
   const url = `${base}/${p}`;
   const headers = { ...(options.headers || {}) };
@@ -11694,9 +11720,88 @@ function startTopbarClock() {
   topbarClockTimer = setInterval(updateTopbarClock, 1000);
 }
 
+/** Direct Frankfurter URL (fallback if same-origin api/fx.php is missing or fails). */
+const TOPBAR_USD_JPY_URL = "https://api.frankfurter.app/latest?from=USD&to=JPY";
+const TOPBAR_FX_REFRESH_MS = 15 * 60 * 1000;
+let topbarFxTimer = null;
+
+function setTopbarFxDisplay(jpy, asOf, sourceLine) {
+  const el = document.querySelector("#topbarFxRate");
+  const wrap = document.querySelector("#topbarFx");
+  if (!el) return;
+  const fmt = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  el.textContent = fmt.format(jpy);
+  if (wrap) {
+    wrap.title = `1 USD = ${fmt.format(jpy)} JPY. ${sourceLine}${asOf ? `, date ${asOf}` : ""}. Updates every 15 min.`;
+  }
+}
+
+function setTopbarFxUnavailable(reason) {
+  const el = document.querySelector("#topbarFxRate");
+  const wrap = document.querySelector("#topbarFx");
+  if (el) el.textContent = "—";
+  if (wrap) wrap.title = reason || "USD/JPY unavailable. Retries every 15 minutes.";
+}
+
+async function updateTopbarUsdJpy() {
+  const el = document.querySelector("#topbarFxRate");
+  if (!el) return;
+  if (IS_FILE_ORIGIN) {
+    setTopbarFxUnavailable(
+      "Live USD/JPY is unavailable on file:// pages. Use http://localhost (e.g. php -S localhost:8080 in this folder)."
+    );
+    return;
+  }
+
+  const base = POS_API_BASE.replace(/\/?$/, "");
+  if (base) {
+    try {
+      const res = await fetch(`${base}/fx.php`, { cache: "no-store", credentials: "same-origin" });
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      const jpy = data?.ok && typeof data.jpy === "number" && Number.isFinite(data.jpy) ? data.jpy : null;
+      if (jpy != null) {
+        setTopbarFxDisplay(jpy, data.date ? String(data.date) : "", "ECB reference (via your server)");
+        return;
+      }
+    } catch {
+      /* fall through to Frankfurter */
+    }
+  }
+
+  try {
+    const res = await fetch(TOPBAR_USD_JPY_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+    const jpy = data?.rates?.JPY;
+    if (typeof jpy !== "number" || !Number.isFinite(jpy)) throw new Error("bad rate");
+    setTopbarFxDisplay(jpy, data.date ? String(data.date) : "", "ECB reference (Frankfurter)");
+  } catch {
+    setTopbarFxUnavailable(
+      base
+        ? "USD/JPY unavailable (api/fx.php and direct API failed). Retries every 15 minutes."
+        : "USD/JPY unavailable. Retries every 15 minutes."
+    );
+  }
+}
+
+function startTopbarFxRefresh() {
+  void updateTopbarUsdJpy();
+  if (topbarFxTimer) clearInterval(topbarFxTimer);
+  topbarFxTimer = setInterval(() => void updateTopbarUsdJpy(), TOPBAR_FX_REFRESH_MS);
+}
+
 async function bootstrap() {
-  if (USE_SUPABASE && location.protocol === "file:") {
-    toast("Use a local server (not file://): open PowerShell in this folder and run: php -S localhost:8080 — then visit http://localhost:8080/");
+  if (IS_FILE_ORIGIN) {
+    toast(
+      USE_SUPABASE
+        ? "Supabase and this app need http(s), not file://. In PowerShell: cd to this folder, run php -S localhost:8080 — then open http://localhost:8080/"
+        : "Open over http (not file://) so the PHP API and USD/JPY load. In PowerShell: cd to this folder, run php -S localhost:8080 — then open http://localhost:8080/"
+    );
   }
   await initRemoteStorage();
   if (!useRemoteDb) {
@@ -11733,6 +11838,7 @@ async function bootstrap() {
   initNav();
   initEvents();
   startTopbarClock();
+  startTopbarFxRefresh();
   await refreshBusinessesFromServer();
   resetVehicleForm();
   updateLeaseSectionVisibility();

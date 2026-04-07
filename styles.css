@@ -368,8 +368,48 @@ p { margin: 6px 0 0; }
 }
 .topbar > * { position: relative; }
 
-.topbar__clock {
+.topbar__center {
   justify-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  transform: translateX(-80px);
+}
+
+.topbar__fx {
+  text-align: center;
+  min-width: 0;
+  padding: 8px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: var(--shadow-xs);
+}
+.topbarFx__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.topbarFx__value {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.topbar__clock {
   text-align: center;
   min-width: 0;
   padding: 8px 16px;
@@ -629,9 +669,16 @@ p { margin: 6px 0 0; }
 .mainNav {
   display: flex;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: center;
+  min-width: 0;
+}
+.mainNav > .navItem,
+.mainNav > a.navItem,
+.mainNav > .menu,
+.mainNav > .topbarAccountWrap {
+  flex-shrink: 0;
 }
 
 /* Top nav pills — crisp, product-style */
@@ -695,6 +742,7 @@ details.menu[open] > summary.navItem .navItem__icon {
 /* Main Menu trigger — chevron + open state */
 details.menu {
   position: relative;
+  flex: 0 0 auto;
 }
 details.menu > summary {
   list-style: none;
@@ -1416,9 +1464,10 @@ main.container:has(#panel-home.is-active) .homeHero__card {
     justify-items: stretch;
     gap: 10px;
   }
-  .topbar__clock {
+  .topbar__center {
     justify-self: center;
     max-width: 100%;
+    transform: translateX(-48px);
   }
   .brand { justify-content: space-between; }
   .topbar__right { justify-content: space-between; }
@@ -1432,10 +1481,15 @@ main.container:has(#panel-home.is-active) .homeHero__card {
 
   .mainNav {
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 6px;
+    max-width: 100%;
   }
-
-  .topbarAccountWrap {
-    align-self: flex-end;
+  .mainNav > .navItem,
+  .mainNav > a.navItem {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 40px;
   }
 
   .topbarAccount__panel {
@@ -1445,23 +1499,27 @@ main.container:has(#panel-home.is-active) .homeHero__card {
   .navItem { white-space: nowrap; }
   .homeQuickNav { grid-template-columns: 1fr 1fr; }
 
-  /* Main menu dropdown should not overlay on mobile */
-  .menu { width: 100%; }
-  .menu__panel {
+  /* Main menu: keep trigger on the nav row; panel stacks below (no overlay) */
+  .mainNav .menu {
+    width: auto;
+    min-width: 0;
+  }
+  .mainNav .menu__panel {
     position: static;
     top: auto;
     right: auto;
-    width: 100%;
+    width: min(300px, calc(100vw - 28px));
+    min-width: min(300px, calc(100vw - 28px));
     margin-top: 10px;
     animation: none;
     box-shadow: var(--shadow-md);
   }
-  .menu__panel::before {
+  .mainNav .menu__panel::before {
     display: none;
   }
-  .menu > summary.navItem--menu,
-  details.menu > summary.navItem--menu {
-    width: 100%;
+  .mainNav .menu > summary.navItem--menu,
+  .mainNav details.menu > summary.navItem--menu {
+    width: auto;
     justify-content: center;
   }
 

@@ -16,7 +16,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260407" />
+    <link rel="stylesheet" href="./styles.css?v=20260415" />
   </head>
   <body class="app">
     <datalist id="ownerTypeSuggestions">
@@ -37,9 +37,15 @@
         </div>
       </div>
 
-      <div class="topbar__clock" id="topbarClock">
-        <time class="topbarClock__date" id="topbarDate"></time>
-        <time class="topbarClock__time" id="topbarTime"></time>
+      <div class="topbar__center">
+        <div class="topbar__fx" id="topbarFx" role="status" aria-live="polite" title="Loading USD/JPY…">
+          <span class="topbarFx__label">USD/JPY</span>
+          <span class="topbarFx__value" id="topbarFxRate">…</span>
+        </div>
+        <div class="topbar__clock" id="topbarClock">
+          <time class="topbarClock__date" id="topbarDate"></time>
+          <time class="topbarClock__time" id="topbarTime"></time>
+        </div>
       </div>
 
       <div class="topbar__end">
@@ -61,6 +67,16 @@
         >
           <svg class="navItem__icon" aria-hidden="true"><use href="#i-car" /></svg>
           Toyo VIN
+        </a>
+        <a
+          class="navItem navItem--external"
+          href="https://eservices.motortraffic.gov.lk/VehicleInfo/tempredirectpage.action"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Sri Lanka Department of Motor Traffic — online registered vehicle information (opens in a new tab)"
+        >
+          <svg class="navItem__icon" aria-hidden="true"><use href="#i-docs" /></svg>
+          RMV
         </a>
 
         <details class="menu" id="mainMenu">
@@ -100,32 +116,32 @@
             </div>
           </div>
         </details>
-      </nav>
 
-      <div class="topbarAccountWrap" id="topbarAccountWrap" hidden>
-        <details class="topbarAccount" id="topbarAccountMenu">
-          <summary class="topbarAccount__trigger" aria-label="Account menu">
-            <span class="topbarAccount__avatar" id="topbarAccountAvatar" aria-hidden="true"></span>
-            <span class="topbarAccount__text">
-              <span class="topbarAccount__name" id="topbarUserName"></span>
-              <span class="topbarAccount__role" id="topbarUserRole"></span>
-            </span>
-            <svg class="topbarAccount__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </summary>
-          <div class="topbarAccount__panel">
-            <div class="topbarAccount__heading">Account details</div>
-            <div id="topbarAccountDropdownBody" class="topbarAccount__body"></div>
-            <button type="button" class="btn btn--ghost topbarAccount__logout" id="btnTopbarLogout">
-              <svg class="topbarAccount__logoutIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+        <div class="topbarAccountWrap" id="topbarAccountWrap" hidden>
+          <details class="topbarAccount" id="topbarAccountMenu">
+            <summary class="topbarAccount__trigger" aria-label="Account menu">
+              <span class="topbarAccount__avatar" id="topbarAccountAvatar" aria-hidden="true"></span>
+              <span class="topbarAccount__text">
+                <span class="topbarAccount__name" id="topbarUserName"></span>
+                <span class="topbarAccount__role" id="topbarUserRole"></span>
+              </span>
+              <svg class="topbarAccount__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
               </svg>
-              Log out
-            </button>
-          </div>
-        </details>
-      </div>
+            </summary>
+            <div class="topbarAccount__panel">
+              <div class="topbarAccount__heading">Account details</div>
+              <div id="topbarAccountDropdownBody" class="topbarAccount__body"></div>
+              <button type="button" class="btn btn--ghost topbarAccount__logout" id="btnTopbarLogout">
+                <svg class="topbarAccount__logoutIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+                </svg>
+                Log out
+              </button>
+            </div>
+          </details>
+        </div>
+      </nav>
       </div>
     </header>
 
@@ -3573,6 +3589,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js?v=20260407"></script>
+    <script src="./app.js?v=20260416"></script>
   </body>
 </html>
