@@ -69,7 +69,7 @@
 
   function marketplaceCopyrightText() {
     const year = new Date().getFullYear();
-    return `© ${year} E-Inventory. All rights reserved.`;
+    return `Copyright © ${year} Axiom Lanka Holdings. All rights reserved.`;
   }
 
   function companyMetaLine(c) {
@@ -183,7 +183,7 @@
         return `
         <article class="marketCard" data-mp-veh="${escapeAttr(v.id)}" tabindex="0" role="link" aria-label="Open ${escapeAttr(title)}">
           <div class="marketCard__imgWrap">
-            <img class="marketCard__img" src="${escapeAttr(img)}" alt="${escapeAttr(title)}" loading="lazy" />
+            <img class="marketCard__img" src="${escapeAttr(img)}" alt="${escapeAttr(title)}" />
           </div>
           <div class="marketCard__body">
             <div class="marketCard__title">${escapeHtml(bits || title)}</div>

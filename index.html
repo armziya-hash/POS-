@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="E-Inventory — professional vehicle inventory, billing, ledger, and sales reporting for dealerships."
+      content="E-Inventory — professional vehicle inventory, invoicing, ledger, and sales reporting for dealerships."
     />
+    <!-- Bump ?v= when styles.css / app.js change so browsers fetch fresh copies (avoids stale theme/background). -->
+    <meta http-equiv="Cache-Control" content="no-cache" />
     <title>E-Inventory · Vehicle sales &amp; inventory</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +16,7 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260407" />
   </head>
   <body class="app">
     <datalist id="ownerTypeSuggestions">
@@ -40,6 +42,7 @@
         <time class="topbarClock__time" id="topbarTime"></time>
       </div>
 
+      <div class="topbar__end">
       <nav class="mainNav" aria-label="Main navigation">
         <button class="navItem navItem--home is-active" type="button" data-nav="home">
           <svg class="navItem__icon" aria-hidden="true"><use href="#i-home" /></svg>
@@ -49,6 +52,16 @@
           <svg class="navItem__icon" aria-hidden="true"><use href="#i-marketplace" /></svg>
           Marketplace
         </button>
+        <a
+          class="navItem navItem--external"
+          href="https://www.toyodiy.com/parts/q.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="ToyoDIY — VIN / parts lookup (opens in a new tab)"
+        >
+          <svg class="navItem__icon" aria-hidden="true"><use href="#i-car" /></svg>
+          Toyo VIN
+        </a>
 
         <details class="menu" id="mainMenu">
           <summary class="navItem navItem--menu">
@@ -58,8 +71,7 @@
           <div class="menu__panel" role="menu" aria-label="Main menu items">
             <button class="menu__item" type="button" data-nav="inventory"><svg class="menu__icon" aria-hidden="true"><use href="#i-inventory" /></svg>Inventory</button>
             <button class="menu__item" type="button" data-nav="purchase"><svg class="menu__icon" aria-hidden="true"><use href="#i-purchase" /></svg>Purchase</button>
-            <button class="menu__item" type="button" data-nav="billing"><svg class="menu__icon" aria-hidden="true"><use href="#i-billing" /></svg>Billing</button>
-            <button class="menu__item" type="button" data-nav="invoices"><svg class="menu__icon" aria-hidden="true"><use href="#i-download" /></svg>Invoice</button>
+            <button class="menu__item" type="button" data-nav="billing"><svg class="menu__icon" aria-hidden="true"><use href="#i-billing" /></svg>Invoice</button>
             <button class="menu__item" type="button" data-nav="ledger"><svg class="menu__icon" aria-hidden="true"><use href="#i-ledger" /></svg>Ledger</button>
             <button class="menu__item" type="button" data-nav="soldVehicleReports"><svg class="menu__icon" aria-hidden="true"><use href="#i-car" /></svg>Sold Vehicle</button>
             <button class="menu__item" type="button" data-nav="refusedVehicles"><svg class="menu__icon" aria-hidden="true"><use href="#i-block" /></svg>Refuse vehicle</button>
@@ -80,16 +92,41 @@
             <button class="menu__item" type="button" data-nav="companyInfo"><svg class="menu__icon" aria-hidden="true"><use href="#i-company" /></svg>Company information</button>
             <button class="menu__item" type="button" data-nav="businesses"><svg class="menu__icon" aria-hidden="true"><use href="#i-company" /></svg>Businesses</button>
             <button class="menu__item" type="button" data-nav="users"><svg class="menu__icon" aria-hidden="true"><use href="#i-users" /></svg>Users</button>
-            <div class="menu__sep"></div>
-            <div class="menu__account">
-              <div class="menu__accountHeading">Account</div>
-              <div class="menu__accountInfo" id="menuAccountInfo"></div>
-              <button class="menu__item menu__item--account" type="button" id="btnMenuLogin"><svg class="menu__icon" aria-hidden="true"><use href="#i-login" /></svg>Log in</button>
-              <button class="menu__item menu__item--account" type="button" id="btnMenuLogout" hidden><svg class="menu__icon" aria-hidden="true"><use href="#i-logout" /></svg>Log out</button>
+            <div class="menu__guestActions" id="menuGuestActions">
+              <div class="menu__sep"></div>
+              <div class="menu__account">
+                <button class="menu__item menu__item--account" type="button" id="btnMenuLogin"><svg class="menu__icon" aria-hidden="true"><use href="#i-login" /></svg>Log in</button>
+              </div>
             </div>
           </div>
         </details>
       </nav>
+
+      <div class="topbarAccountWrap" id="topbarAccountWrap" hidden>
+        <details class="topbarAccount" id="topbarAccountMenu">
+          <summary class="topbarAccount__trigger" aria-label="Account menu">
+            <span class="topbarAccount__avatar" id="topbarAccountAvatar" aria-hidden="true"></span>
+            <span class="topbarAccount__text">
+              <span class="topbarAccount__name" id="topbarUserName"></span>
+              <span class="topbarAccount__role" id="topbarUserRole"></span>
+            </span>
+            <svg class="topbarAccount__chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </summary>
+          <div class="topbarAccount__panel">
+            <div class="topbarAccount__heading">Account details</div>
+            <div id="topbarAccountDropdownBody" class="topbarAccount__body"></div>
+            <button type="button" class="btn btn--ghost topbarAccount__logout" id="btnTopbarLogout">
+              <svg class="topbarAccount__logoutIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+              Log out
+            </button>
+          </div>
+        </details>
+      </div>
+      </div>
     </header>
 
     <main class="container">
@@ -107,7 +144,7 @@
                 </button>
                 <button class="btn btn--primary homeQuickNav__btn" id="btnHomeBilling" type="button">
                   <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-billing" /></svg>
-                  Billing
+                  Invoice
                 </button>
                 <button class="btn btn--primary homeQuickNav__btn" id="btnHomePurchase" type="button">
                   <svg class="homeQuickNav__icon" aria-hidden="true"><use href="#i-purchase" /></svg>
@@ -123,10 +160,11 @@
                 </button>
               </div>
               <div class="homeKpis" aria-label="Key metrics">
-                <div class="homeKpi">
+                <div class="homeKpi homeKpi--inventory">
                   <div class="homeKpi__label">In stock</div>
                   <div class="homeKpi__value" id="homeKpiInventory">0</div>
-                  <div class="homeKpi__sub muted">Vehicles available</div>
+                  <div class="homeKpi__sub muted">Vehicles available · by type</div>
+                  <div id="homeKpiInventoryByType" class="homeKpiInventoryByType" hidden></div>
                 </div>
                 <div class="homeKpi">
                   <div class="homeKpi__label">Sold</div>
@@ -138,29 +176,43 @@
                   <div class="homeKpi__value" id="homeKpiTodaySales">0</div>
                   <div class="homeKpi__sub muted">Sales today</div>
                 </div>
-                <div class="homeKpi">
-                  <div class="homeKpi__label">Suppliers</div>
-                  <div class="homeKpi__value" id="homeKpiSuppliers">0</div>
-                  <div class="homeKpi__sub muted">Active partners</div>
+                <div class="homeKpi homeKpi--garage">
+                  <div class="homeKpi__label">Garage</div>
+                  <div class="homeKpi__value" id="homeKpiGarage">0</div>
+                  <div class="homeKpi__sub muted" id="homeKpiGarageSub">—</div>
+                  <div id="homeKpiGarageDetails" class="homeKpiGarageDetails" hidden></div>
                 </div>
               </div>
               <div class="card homeHero__quickSearchCard">
                 <div class="card__header">
                   <h3>Quick Vehicle Search</h3>
                 </div>
-                <div class="homeSearchPill" role="search">
-                  <input
-                    id="homeVehicleSearch"
-                    class="homeSearchPill__input"
-                    type="search"
-                    placeholder="Search"
-                    aria-label="Search by Stock No or Vehicle Number"
-                  />
-                  <button class="homeSearchPill__btn" id="btnHomeVehicleSearch" type="button" aria-label="Search">
-                    <svg class="homeSearchPill__icon" aria-hidden="true"><use href="#i-search" /></svg>
-                  </button>
+                <div class="homeQuickSearch" id="homeQuickSearch">
+                  <div class="homeSearchPill" role="search">
+                    <input
+                      id="homeVehicleSearch"
+                      class="homeSearchPill__input"
+                      type="search"
+                      placeholder="Stock no., plate, or VIN"
+                      aria-label="Search vehicles by stock number, vehicle number (plate), or VIN only"
+                      aria-expanded="false"
+                      aria-controls="homeVehicleSearchDropdown"
+                      aria-autocomplete="list"
+                      autocomplete="off"
+                    />
+                    <button class="homeSearchPill__btn" id="btnHomeVehicleSearch" type="button" aria-label="Search">
+                      <svg class="homeSearchPill__icon" aria-hidden="true"><use href="#i-search" /></svg>
+                    </button>
+                  </div>
+                  <div
+                    id="homeVehicleSearchDropdown"
+                    class="homeVehicleSearchDropdown"
+                    hidden
+                    role="listbox"
+                    aria-label="Matching vehicles"
+                  ></div>
+                  <div class="card__footer muted homeHero__quickSearchFooter" id="homeVehicleSearchSummary" hidden></div>
                 </div>
-                <div class="card__footer muted homeHero__quickSearchFooter" id="homeVehicleSearchSummary" hidden></div>
               </div>
               <div class="homeHero__hint muted" hidden></div>
               <div class="homeHero__hint muted" id="homeCopyright" style="margin-top:12px; text-align:center;"></div>
@@ -207,7 +259,7 @@
         <div class="panel__header">
           <div>
             <h2>Inventory</h2>
-            <p class="muted">Use <strong>+ Add new vehicle</strong> to open the form in a window. Attach documents, edit/delete, and add to cart from the list.</p>
+            <p class="muted">Use <strong>+ Add new vehicle</strong> to open the form in a window. Attach documents, edit/delete. To sell, use <strong>Invoice</strong> and add vehicles from inventory there.</p>
           </div>
           <div class="panel__actions">
             <button class="btn" id="btnExportData" title="Export data JSON">Export</button>
@@ -311,28 +363,155 @@
         </div>
       </section>
 
-      <section class="panel" id="panel-billing" data-panel="billing" role="tabpanel">
-        <div class="panel__header">
+      <section class="panel billingPanelRoot" id="panel-billing" data-panel="billing" role="tabpanel">
+        <div class="panel__header billingPanel__header">
           <div>
-            <h2>Billing</h2>
-            <p class="muted">Add items from inventory to cart, generate invoice, and print.</p>
+            <h2>Invoice</h2>
+            <p class="muted" id="billingPanelSubtitle">Add vehicles from inventory, set invoice details, then complete the sale or print.</p>
           </div>
-          <div class="panel__actions">
-            <button class="btn btn--ghost" id="btnClearCart">Clear Cart</button>
-            <button class="btn btn--primary" id="btnCompleteSale">Complete Sale</button>
-            <button class="btn" id="btnPrintInvoice">Print Bill</button>
+          <div class="panel__actions billingPanel__actions billingPanel__actions--sale" id="billingSaleActions">
+            <button class="btn btn--ghost" id="btnClearCart">Clear invoice lines</button>
+            <button class="btn btn--primary" id="btnCompleteSale">Complete sale</button>
           </div>
         </div>
 
-        <div class="grid grid--2">
-          <div class="card">
-            <div class="card__header">
-              <h3>Cart</h3>
-              <span class="badge" id="cartCountBadge">0</span>
+        <div class="billingModeTabs" role="tablist" aria-label="Invoice views">
+          <button class="billingModeTabs__btn is-active" type="button" role="tab" id="btnBillingModeSale" aria-selected="true">
+            Sales invoice
+          </button>
+          <button class="billingModeTabs__btn" type="button" role="tab" id="btnBillingModeInvoicePreview" aria-selected="false">
+            Invoice &amp; preview
+          </button>
+          <button class="billingModeTabs__btn" type="button" role="tab" id="btnBillingModeInvoiceDetails" aria-selected="false">
+            Invoice details
+          </button>
+        </div>
+
+        <div id="billingSubviewSale" class="billingSubview billingSubview--sale">
+        <div class="billingWorkspace billingWorkspace--sale">
+          <div class="card billingCard billingCard--lines billingSaleCard">
+            <div class="card__header billingSaleCard__header">
+              <div class="billingSaleCard__headText">
+                <h3>Sales invoice</h3>
+                <p class="billingSaleCard__tagline muted">Customer, vehicles, extras — then complete or open preview.</p>
+              </div>
+              <span class="badge badge--saleLines" id="cartCountBadge">0</span>
             </div>
 
-            <div class="tableWrap">
-              <table class="table" id="cartTable">
+            <div class="card__body billingCard__section billingCard__section--invoiceFields">
+              <div class="billingSaleSection">
+                <div class="billingSaleSection__head">
+                  <span class="billingSaleSection__step" aria-hidden="true">1</span>
+                  <div class="billingSaleSection__headText">
+                    <h4 class="billingSaleSection__title">Customer &amp; invoice</h4>
+                    <p class="billingSaleSection__hint muted">Party, dates, payment, and document checklist.</p>
+                  </div>
+                </div>
+              <div class="formGrid billingSalesInvoiceForm">
+                <label class="field field--full">
+                  <span>Customer from list</span>
+                  <select id="invoiceCustomerPick" class="input" title="Choose a saved customer; name and phone fill below">
+                    <option value="">— Select customer —</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Invoice date</span>
+                  <input id="invoiceDate" type="date" />
+                </label>
+                <label class="field">
+                  <span>Customer name</span>
+                  <input id="invoiceCustomerName" type="text" placeholder="Walk-in or type name" autocomplete="name" />
+                </label>
+                <label class="field">
+                  <span>Customer phone</span>
+                  <input id="invoiceCustomerPhone" type="tel" placeholder="optional" autocomplete="tel" />
+                </label>
+                <label class="field">
+                  <span>Payment Method</span>
+                  <select id="paymentMethod">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank</option>
+                    <option value="Card">Card</option>
+                    <option value="E-Wallet">E-Wallet</option>
+                    <option value="Mixed">Mixed</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Invoice No.</span>
+                  <input id="invoiceNo" type="text" placeholder="auto" />
+                </label>
+                <label class="field">
+                  <span>Customer ID Number</span>
+                  <input id="bearingAmount" type="text" placeholder="Customer ID / NIC / Passport No." />
+                </label>
+                <label class="field">
+                  <span>Paid Amount</span>
+                  <input id="sumLkrAmount" type="number" min="0" step="0.01" placeholder="Enter paid amount" />
+                </label>
+                <label class="field field--full">
+                  <span>Remarks</span>
+                  <textarea id="invoiceRemarks" rows="3" placeholder="optional"></textarea>
+                </label>
+                <div class="field field--full billingDocField billingDocField--collapsible">
+                  <details class="billingDocDetails" id="billingDocDetails">
+                    <summary class="billingDocDetails__summary">Documents (tick)</summary>
+                    <div class="billingDocDetails__body">
+                      <p class="billingDocField__hint muted">Tick each document supplied with this vehicle.</p>
+                      <div class="billingDocGrid" role="group" aria-label="Invoice documents checklist">
+                        <label class="billingDocItem">
+                          <input id="docOriginalCr" type="checkbox" />
+                          <span class="billingDocItem__text">Original CR</span>
+                        </label>
+                        <label class="billingDocItem">
+                          <input id="docNoObjection" type="checkbox" />
+                          <span class="billingDocItem__text">No objection letter</span>
+                        </label>
+                        <label class="billingDocItem">
+                          <input id="docDeletion" type="checkbox" />
+                          <span class="billingDocItem__text">Deletion</span>
+                        </label>
+                        <label class="billingDocItem">
+                          <input id="docRevenueLicence" type="checkbox" />
+                          <span class="billingDocItem__text">Revenue licence</span>
+                        </label>
+                      </div>
+                      <label class="field field--full billingDocOthers">
+                        <span>Other documents</span>
+                        <input id="docOthers" type="text" placeholder="Describe any other documents (optional)" />
+                      </label>
+                    </div>
+                  </details>
+                </div>
+              </div>
+              </div>
+            </div>
+
+            <div class="card__body billingCard__section billingCard__section--linesSearch">
+              <div class="billingSaleSection">
+                <div class="billingSaleSection__head">
+                  <span class="billingSaleSection__step" aria-hidden="true">2</span>
+                  <div class="billingSaleSection__headText">
+                    <h4 class="billingSaleSection__title">Vehicles on this invoice</h4>
+                    <p class="billingSaleSection__hint muted">Pick from inventory by stock no., VIN, make, or model.</p>
+                  </div>
+                </div>
+              <label class="field field--full billingField--search">
+                <span>Vehicle (from inventory)</span>
+                <input
+                  id="billingInvSearch"
+                  class="input input--billing"
+                  type="search"
+                  list="billingInvSuggestions"
+                  placeholder="Type stock no. / VIN / make / model… then pick"
+                  autocomplete="off"
+                />
+              </label>
+              <datalist id="billingInvSuggestions"></datalist>
+              </div>
+            </div>
+
+            <div class="tableWrap billingTableWrap billingTableWrap--cart">
+              <table class="table billingSaleTable" id="cartTable">
                 <thead>
                   <tr>
                     <th>Stock</th>
@@ -345,13 +524,16 @@
               </table>
             </div>
 
-            <div class="card" style="margin: 12px 14px 0; border-radius: 12px;">
-              <div class="card__header" style="padding: 12px 14px;">
-                <h3 style="margin:0; font-size: 14px;">Extra items</h3>
+            <div class="billingNestedCard billingNestedCard--extras">
+              <div class="billingNestedCard__header">
+                <div class="billingNestedCard__titleRow">
+                  <span class="billingSaleSection__step billingSaleSection__step--sm" aria-hidden="true">3</span>
+                  <h4 class="billingNestedCard__title">Extra items</h4>
+                </div>
                 <span class="badge badge--soft" id="cartExtrasCount">0</span>
               </div>
-              <div class="card__body" style="padding: 12px 14px;">
-                <div class="formGrid" style="padding:0;">
+              <div class="billingNestedCard__body">
+                <div class="formGrid billingNestedCard__form">
                   <label class="field field--full">
                     <span>Item name</span>
                     <input id="cartExtraName" type="text" placeholder="e.g. Document fee" autocomplete="off" />
@@ -365,10 +547,10 @@
                     <input id="cartExtraPrice" type="number" inputmode="decimal" min="0" step="0.01" value="0" />
                   </label>
                 </div>
-                <div class="row" style="justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+                <div class="billingNestedCard__actions">
                   <button class="btn btn--table btn--table-primary" id="btnAddCartExtra" type="button">Add item</button>
                 </div>
-                <div class="tableWrap" style="margin-top: 10px;">
+                <div class="tableWrap billingTableWrap billingTableWrap--extras">
                   <table class="table table--dense" id="cartExtrasTable">
                     <thead>
                       <tr>
@@ -385,12 +567,12 @@
               </div>
             </div>
 
-            <div class="totals">
+            <div class="totals billingTotals">
               <div class="totals__row">
                 <span>Subtotal</span>
                 <strong id="cartSubtotal">0.00</strong>
               </div>
-              <div class="totals__row">
+              <div class="totals__row totals__row--grand">
                 <label class="field field--inline">
                   <span>Discount</span>
                   <input id="cartDiscount" type="number" min="0" step="0.01" value="0" />
@@ -399,344 +581,385 @@
               </div>
             </div>
           </div>
+        </div>
+        </div>
 
-          <div class="card">
-            <div class="card__header">
-              <h3>Invoice Details</h3>
-              <span class="badge badge--soft">Preview</span>
+        <div id="billingSubviewInvoicePreview" class="billingSubview billingSubview--invoicePreview" hidden>
+          <div class="billingInvoicePreviewWrap invoiceA4PreviewFrame">
+            <div class="card billingCard billingCard--invoice">
+              <div class="card__header">
+                <h3>Invoice &amp; preview</h3>
+                <span class="badge badge--soft">Live preview</span>
+              </div>
+
+              <div class="invoicePreview invoicePreview--billing" id="invoicePreview">
+                <div class="invoice invoice--layout-standard">
+                  <div class="invoiceHead">
+                    <div class="invoiceHead__brand">
+                      <img id="invLogo" class="invoice__logo" alt="Logo" hidden />
+                      <div>
+                        <div class="invoice__title" id="invTitle">Vehicle Sale Invoice</div>
+                        <div class="muted" id="invCompanyLine" style="margin-top:4px;">—</div>
+                      </div>
+                    </div>
+                    <div class="invoiceHead__meta">
+                      <div>Invoice: <strong id="invNo">—</strong></div>
+                      <div>Date: <strong id="invDate">—</strong></div>
+                    </div>
+                  </div>
+
+                  <div class="invoiceDocTitle">DEALERS IN MOTOR VEHICLES</div>
+
+                  <div class="invoiceLine">
+                    SALE OF: <span id="invSaleOf">—</span>
+                    <span id="invMetaLine" hidden></span>
+                  </div>
+                  <div class="invoiceLine">REG NO: <span id="invRegNo">—</span></div>
+
+                  <div class="tableWrap">
+                    <table class="table table--dense" id="invoiceItemsTable">
+                      <thead>
+                        <tr>
+                          <th>Stock</th>
+                          <th>Description</th>
+                          <th class="num">Price</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+
+                  <div class="invoiceLine">
+                    I / we have sold the above-mentioned vehicle to Mr/Mrs/Ms
+                    <span id="invCustomer">Walk-in</span> (phone: <span id="invPhone">—</span>)
+                  </div>
+
+                  <div class="invoiceLine">
+                    Bearing ID no: <span id="invBearingAmount">—</span>
+                    for the sum of <span id="invSumLkrAmount">0.00</span>
+                    <span id="invSubtotal" hidden>0.00</span>
+                    <span id="invDiscount" hidden>0.00</span>
+                    <span id="invTotal" hidden>0.00</span>
+                  </div>
+                  <div class="invoiceLine">(In words) <span id="invAmountWords">—</span></div>
+                  <div class="invoiceLine">
+                    And have the following payments:
+                    <span id="invPaymentsSummary">—</span>
+                  </div>
+                  <div class="invoiceLine">Payment method: <span id="invPayment">Cash</span></div>
+
+                  <div class="invoiceDocs">
+                    <div class="invoiceDocs__title">DOCUMENTS</div>
+                    <div class="invoiceDocsMatrix" aria-label="Documents checklist">
+                      <div class="invoiceDocsMatrix__row">
+                        <div class="invoiceDocsMatrix__pair">
+                          <span class="invoiceDocsMatrix__k">Original CR</span>
+                          <span class="invoiceDocsMatrix__v" id="invDocOriginalCr">—</span>
+                        </div>
+                        <div class="invoiceDocsMatrix__pair">
+                          <span class="invoiceDocsMatrix__k">No objection letter</span>
+                          <span class="invoiceDocsMatrix__v" id="invDocNoObj">—</span>
+                        </div>
+                      </div>
+                      <div class="invoiceDocsMatrix__row">
+                        <div class="invoiceDocsMatrix__pair">
+                          <span class="invoiceDocsMatrix__k">Deletion</span>
+                          <span class="invoiceDocsMatrix__v" id="invDocDeletion">—</span>
+                        </div>
+                        <div class="invoiceDocsMatrix__pair">
+                          <span class="invoiceDocsMatrix__k">Revenue licence</span>
+                          <span class="invoiceDocsMatrix__v" id="invDocRevenue">—</span>
+                        </div>
+                      </div>
+                      <div class="invoiceDocsMatrix__row invoiceDocsMatrix__row--others">
+                        <span class="invoiceDocsMatrix__k">Others</span>
+                        <span class="invoiceDocsMatrix__v invoiceDocsMatrix__v--others" id="invDocOthers">—</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="invoice__footer muted" id="invFooter">Thank you.</div>
+
+                  <div class="invoiceTerms">
+                    <div><strong>TERMS AND CONDITIONS</strong></div>
+                    <div id="invTerms">
+                      Ownership of the vehicle should be transferred within 10 days from the date of sale.
+                    </div>
+                  </div>
+
+                  <div class="invoiceSignGrid">
+                    <div class="invoiceSign">
+                      <div class="line">SELLER SIGNATURE</div>
+                      <div class="line">WITNESS</div>
+                      <div class="line">NAME</div>
+                      <div class="line">NIC</div>
+                      <div class="line">SIGNATURE</div>
+                    </div>
+                    <div class="invoiceSign">
+                      <div class="line">BUYER SIGNATURE</div>
+                      <div class="line">WITNESS</div>
+                      <div class="line">NAME</div>
+                      <div class="line">NIC</div>
+                      <div class="line">SIGNATURE</div>
+                    </div>
+                  </div>
+                  <div class="invoice__copyright muted" id="invCopyright"></div>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
 
-            <div class="formGrid">
-              <label class="field field--full">
-                <span>Customer from list</span>
-                <select id="invoiceCustomerPick" class="input" title="Choose a saved customer; name and phone fill below">
-                  <option value="">— Select customer —</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Customer name</span>
-                <input id="invoiceCustomerName" type="text" placeholder="Walk-in or type name" autocomplete="name" />
-              </label>
-              <label class="field">
-                <span>Customer phone</span>
-                <input id="invoiceCustomerPhone" type="tel" placeholder="optional" autocomplete="tel" />
-              </label>
-              <label class="field">
-                <span>Payment Method</span>
-                <select id="paymentMethod">
-                  <option value="Cash">Cash</option>
-                  <option value="Bank">Bank</option>
-                  <option value="Card">Card</option>
-                  <option value="E-Wallet">E-Wallet</option>
-                  <option value="Mixed">Mixed</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Invoice No.</span>
-                <input id="invoiceNo" type="text" placeholder="auto" />
-              </label>
-              <label class="field">
-                <span>BEARING Customer ID Number</span>
-                <input id="bearingAmount" type="text" placeholder="Customer ID / NIC / Passport No." />
-              </label>
-              <label class="field">
-                <span>Paid Amount</span>
-                <input id="sumLkrAmount" type="number" min="0" step="0.01" placeholder="Enter paid amount" />
-              </label>
-              <label class="field field--full">
-                <span>Remarks</span>
-                <textarea id="invoiceRemarks" rows="3" placeholder="optional"></textarea>
-              </label>
-              <div class="field field--full billingDocField">
-                <span class="billingDocField__label">Documents (tick)</span>
-                <p class="billingDocField__hint muted">Tick each document supplied with this vehicle.</p>
-                <div class="billingDocGrid" role="group" aria-label="Invoice documents checklist">
-                  <label class="billingDocItem">
-                    <input id="docOriginalCr" type="checkbox" />
-                    <span class="billingDocItem__text">Original CR</span>
+        <div id="billingSubviewInvoiceDetails" class="billingSubview billingSubview--invoiceDetails" hidden>
+          <div class="card billingInvoiceArchiveCard">
+            <div class="card__header billingInvoiceArchiveCard__header">
+              <div class="billingInvoiceArchiveCard__titleBlock">
+                <h3>Past invoices</h3>
+              </div>
+              <div class="billingInvoiceArchiveCard__toolbar">
+                <label class="field billingArchiveDateField">
+                  <span>From</span>
+                  <input id="invoiceArchiveFrom" type="date" title="Start of date range" />
+                </label>
+                <label class="field billingArchiveDateField">
+                  <span>To</span>
+                  <input id="invoiceArchiveTo" type="date" title="End of date range" />
+                </label>
+                <input
+                  id="invoiceArchiveSearch"
+                  class="input billingInvoiceArchiveCard__search"
+                  type="search"
+                  placeholder="Search invoice no., customer, phone, stock, VIN…"
+                />
+              </div>
+            </div>
+            <div class="tableWrap">
+              <table class="table" id="invoicesArchiveTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Invoice no.</th>
+                    <th>Customer</th>
+                    <th>Payment</th>
+                    <th class="num">Total</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="card__footer muted" id="invoicesArchiveSummary">0 invoices</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel billingPanelRoot" id="panel-quotation" data-panel="quotation" role="tabpanel">
+        <div class="panel__header billingPanel__header">
+          <div>
+            <h2>Quotation</h2>
+            <p class="muted" id="quotationPanelSubtitle">
+              Select customer and vehicle, then save, send, or print — same flow as Invoice.
+            </p>
+          </div>
+          <div class="panel__actions billingPanel__actions quotationToolbar" id="quotationHeaderActions">
+            <button class="btn btn--quotation-save" id="btnSaveQuotation" type="button">
+              <svg class="btn__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                <path d="M17 21v-8H7v8M7 3v5h8" />
+              </svg>
+              Save quotation
+            </button>
+            <div class="quotationToolbar__cta">
+              <button class="btn btn--whatsapp" id="btnSendQuotationWhatsapp" type="button">
+                <svg class="btn__icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+                  />
+                </svg>
+                WhatsApp
+              </button>
+              <button class="btn btn--primary btn--quotation-print" id="btnPrintQuotation" type="button">
+                <svg class="btn__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                  <path d="M6 14h12v8H6z" />
+                </svg>
+                Print quotation
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="billingModeTabs" role="tablist" aria-label="Quotation views">
+          <button
+            class="billingModeTabs__btn is-active"
+            type="button"
+            role="tab"
+            id="btnQuotationModeCreate"
+            aria-selected="true"
+          >
+            Create quotation
+          </button>
+          <button class="billingModeTabs__btn" type="button" role="tab" id="btnQuotationModePreview" aria-selected="false">
+            Quotation &amp; preview
+          </button>
+          <button class="billingModeTabs__btn" type="button" role="tab" id="btnQuotationModeList" aria-selected="false">
+            Saved quotations
+          </button>
+        </div>
+
+        <div id="quotationSubviewCreate" class="billingSubview billingSubview--sale billingSubview--quotationCreate">
+          <div class="billingWorkspace billingWorkspace--sale">
+            <div class="card billingCard billingCard--lines billingSaleCard">
+              <div class="card__header billingSaleCard__header">
+                <div class="billingSaleCard__headText">
+                  <h3>Create quotation</h3>
+                  <p class="billingSaleCard__tagline muted">Customer, vehicle, price, and terms — then preview, save, or print.</p>
+                </div>
+                <span class="badge badge--saleLines" id="quotationLineBadge">No vehicle</span>
+              </div>
+
+              <div class="card__body billingCard__section billingCard__section--invoiceFields">
+                <div class="billingSaleSection">
+                  <div class="billingSaleSection__head">
+                    <span class="billingSaleSection__step" aria-hidden="true">1</span>
+                    <div class="billingSaleSection__headText">
+                      <h4 class="billingSaleSection__title">Customer &amp; quotation details</h4>
+                      <p class="billingSaleSection__hint muted">Reference, dates, and party — like the invoice header.</p>
+                    </div>
+                  </div>
+                  <div class="formGrid billingSalesInvoiceForm">
+                    <label class="field field--full">
+                      <span>Customer from list</span>
+                      <select id="quotationCustomerPick" class="input" title="Choose a saved customer">
+                        <option value="">— Select customer —</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Quotation ref.</span>
+                      <input id="quotationRefNo" type="text" placeholder="Auto when printing / saving" />
+                    </label>
+                    <label class="field">
+                      <span>Date</span>
+                      <input id="quotationDate" type="date" />
+                    </label>
+                    <label class="field">
+                      <span>Valid until</span>
+                      <input id="quotationValidUntil" type="date" />
+                    </label>
+                    <label class="field">
+                      <span>Customer name</span>
+                      <input id="quotationCustomerName" type="text" placeholder="Customer name" autocomplete="name" />
+                    </label>
+                    <label class="field">
+                      <span>Customer phone</span>
+                      <input id="quotationCustomerPhone" type="tel" placeholder="Phone number" autocomplete="tel" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card__body billingCard__section billingCard__section--linesSearch">
+                <div class="billingSaleSection">
+                  <div class="billingSaleSection__head">
+                    <span class="billingSaleSection__step" aria-hidden="true">2</span>
+                    <div class="billingSaleSection__headText">
+                      <h4 class="billingSaleSection__title">Vehicle &amp; amount</h4>
+                      <p class="billingSaleSection__hint muted">Pick from inventory; price defaults to selling price.</p>
+                    </div>
+                  </div>
+                  <label class="field field--full">
+                    <span>Vehicle (from inventory)</span>
+                    <select id="quotationVehiclePick" class="input">
+                      <option value="">— Select vehicle —</option>
+                    </select>
                   </label>
-                  <label class="billingDocItem">
-                    <input id="docNoObjection" type="checkbox" />
-                    <span class="billingDocItem__text">No objection letter</span>
-                  </label>
-                  <label class="billingDocItem">
-                    <input id="docDeletion" type="checkbox" />
-                    <span class="billingDocItem__text">Deletion</span>
-                  </label>
-                  <label class="billingDocItem">
-                    <input id="docRevenueLicence" type="checkbox" />
-                    <span class="billingDocItem__text">Revenue licence</span>
+                  <div class="formGrid billingSalesInvoiceForm" style="margin-top: 10px">
+                    <label class="field">
+                      <span>Quoted price</span>
+                      <input id="quotationPrice" type="number" min="0" step="0.01" placeholder="0.00" />
+                    </label>
+                    <label class="field field--full">
+                      <span>Remarks</span>
+                      <input id="quotationRemarks" type="text" placeholder="Optional remarks" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="billingNestedCard billingNestedCard--extras">
+                <div class="billingNestedCard__header">
+                  <div class="billingNestedCard__titleRow">
+                    <span class="billingSaleSection__step billingSaleSection__step--sm" aria-hidden="true">3</span>
+                    <h4 class="billingNestedCard__title">Terms &amp; conditions</h4>
+                  </div>
+                  <button class="btn btn--secondary btn--quotation-terms" type="button" id="btnQuotationTermsDefault">Save as default</button>
+                </div>
+                <div class="billingNestedCard__body">
+                  <p class="muted" style="margin: 0 0 10px">
+                    Edit for this quotation. <strong>Save as default</strong> stores the text for future quotes.
+                  </p>
+                  <label class="field field--full">
+                    <span>Terms (print &amp; PDF)</span>
+                    <textarea id="quotationTerms" class="input" rows="10" placeholder="Terms and conditions…"></textarea>
                   </label>
                 </div>
-                <label class="field field--full billingDocOthers">
-                  <span>Other documents</span>
-                  <input id="docOthers" type="text" placeholder="Describe any other documents (optional)" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="quotationSubviewPreview" class="billingSubview billingSubview--quotationPreview" hidden>
+          <div class="billingInvoicePreviewWrap invoiceA4PreviewFrame">
+            <div class="card billingCard billingCard--invoice">
+              <div class="card__header">
+                <h3>Quotation &amp; preview</h3>
+                <span class="badge badge--soft">Live preview</span>
+              </div>
+              <div class="quotationPreviewA4" id="quotationPreviewMount">
+                <div id="quotationPreview" class="muted">Select a vehicle to preview the formal quotation layout.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="quotationSubviewList" class="billingSubview billingSubview--quotationList" hidden>
+          <div class="card billingInvoiceArchiveCard">
+            <div class="card__header billingInvoiceArchiveCard__header">
+              <div class="billingInvoiceArchiveCard__titleBlock">
+                <h3>Saved quotations</h3>
+              </div>
+              <div class="billingInvoiceArchiveCard__toolbar">
+                <label class="field billingArchiveDateField">
+                  <span>From</span>
+                  <input id="quotationListDateFrom" type="date" title="Start of date range" />
+                </label>
+                <label class="field billingArchiveDateField">
+                  <span>To</span>
+                  <input id="quotationListDateTo" type="date" title="End of date range" />
                 </label>
               </div>
             </div>
-
-            <div class="invoicePreview" id="invoicePreview">
-              <div class="invoice">
-                <div class="invoiceHead">
-                  <div class="invoiceHead__brand">
-                    <img id="invLogo" class="invoice__logo" alt="Logo" hidden />
-                    <div>
-                      <div class="invoice__title" id="invTitle">Vehicle Sale Invoice</div>
-                      <div class="muted" id="invCompanyLine" style="margin-top:4px;">—</div>
-                    </div>
-                  </div>
-                  <div class="invoiceHead__meta">
-                    <div>Invoice: <strong id="invNo">—</strong></div>
-                    <div>Date: <strong id="invDate">—</strong></div>
-                  </div>
-                </div>
-
-                <div class="invoiceDocTitle">DEALERS IN MOTOR VEHICLES</div>
-
-                <div class="invoiceLine">
-                  SALE OF: <span id="invSaleOf">—</span>
-                  <span id="invMetaLine" hidden></span>
-                </div>
-                <div class="invoiceLine">REG NO: <span id="invRegNo">—</span></div>
-
-                <div class="tableWrap">
-                  <table class="table table--dense" id="invoiceItemsTable">
-                    <thead>
-                      <tr>
-                        <th>Stock</th>
-                        <th>Description</th>
-                        <th class="num">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-
-                <div class="invoiceLine">
-                  I / WE HAVE SOLD THE ABOVE MENTIONED VEHICLE TO MR/MRS/MS
-                  <span id="invCustomer">Walk-in</span> (Phone: <span id="invPhone">—</span>)
-                </div>
-
-                <div class="invoiceLine">
-                  BEARING ID NO: <span id="invBearingAmount">—</span>
-                  for the sum of LKR <span id="invSumLkrAmount">0.00</span>
-                  <span id="invSubtotal" hidden>0.00</span>
-                  <span id="invDiscount" hidden>0.00</span>
-                  <span id="invTotal" hidden>0.00</span>
-                </div>
-                <div class="invoiceLine">(IN WORDS) <span id="invAmountWords">—</span></div>
-                <div class="invoiceLine">
-                  AND HAVE THE FOLLOWING PAYMENTS:
-                  <span id="invPaymentsSummary">—</span>
-                </div>
-                <div class="invoiceLine">PAYMENT METHOD: <span id="invPayment">Cash</span></div>
-
-                <div class="invoiceDocs">
-                  <div class="invoiceDocs__title">DOCUMENTS</div>
-                  <div class="invoiceDocsMatrix" aria-label="Documents checklist">
-                    <div class="invoiceDocsMatrix__row">
-                      <div class="invoiceDocsMatrix__pair">
-                        <span class="invoiceDocsMatrix__k">Original CR</span>
-                        <span class="invoiceDocsMatrix__v" id="invDocOriginalCr">—</span>
-                      </div>
-                      <div class="invoiceDocsMatrix__pair">
-                        <span class="invoiceDocsMatrix__k">No objection letter</span>
-                        <span class="invoiceDocsMatrix__v" id="invDocNoObj">—</span>
-                      </div>
-                    </div>
-                    <div class="invoiceDocsMatrix__row">
-                      <div class="invoiceDocsMatrix__pair">
-                        <span class="invoiceDocsMatrix__k">Deletion</span>
-                        <span class="invoiceDocsMatrix__v" id="invDocDeletion">—</span>
-                      </div>
-                      <div class="invoiceDocsMatrix__pair">
-                        <span class="invoiceDocsMatrix__k">Revenue licence</span>
-                        <span class="invoiceDocsMatrix__v" id="invDocRevenue">—</span>
-                      </div>
-                    </div>
-                    <div class="invoiceDocsMatrix__row invoiceDocsMatrix__row--others">
-                      <span class="invoiceDocsMatrix__k">Others</span>
-                      <span class="invoiceDocsMatrix__v invoiceDocsMatrix__v--others" id="invDocOthers">—</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="invoice__footer muted" id="invFooter">Thank you.</div>
-
-                <div class="invoiceTerms">
-                  <div><strong>TERMS AND CONDITIONS</strong></div>
-                  <div id="invTerms">
-                    Ownership of the vehicle should be transferred within 10 days from the date of sale.
-                  </div>
-                </div>
-
-                <div class="invoiceSignGrid">
-                  <div class="invoiceSign">
-                    <div class="line">SELLER SIGNATURE</div>
-                    <div class="line">WITNESS</div>
-                    <div class="line">NAME</div>
-                    <div class="line">NIC</div>
-                    <div class="line">SIGNATURE</div>
-                  </div>
-                  <div class="invoiceSign">
-                    <div class="line">BUYER SIGNATURE</div>
-                    <div class="line">WITNESS</div>
-                    <div class="line">NAME</div>
-                    <div class="line">NIC</div>
-                    <div class="line">SIGNATURE</div>
-                  </div>
-                </div>
-                <div class="invoice__copyright muted" id="invCopyright"></div>
-              </div>
+            <p class="muted" style="margin: 0 18px 12px">
+              Default range is about the last month. Clear both dates to list all saved quotations.
+            </p>
+            <div class="tableWrap">
+              <table class="table" id="quotationTable">
+                <thead>
+                  <tr>
+                    <th>Ref / Date</th>
+                    <th>Customer</th>
+                    <th>Vehicle</th>
+                    <th>Valid Until</th>
+                    <th class="num">Amount</th>
+                    <th class="actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
+            <div class="card__footer muted" id="quotationSummary">0 quotations</div>
           </div>
-        </div>
-      </section>
-
-      <section class="panel" id="panel-invoices" data-panel="invoices" role="tabpanel">
-        <div class="panel__header">
-          <div>
-            <h2>Invoice</h2>
-            <p class="muted">Find past vehicle sale invoices and open them in Billing or print / save as PDF.</p>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card__header" style="align-items: center; gap: 12px; flex-wrap: wrap">
-            <h3 style="margin: 0">Past invoices</h3>
-            <input
-              id="invoiceArchiveSearch"
-              class="input"
-              type="search"
-              placeholder="Search invoice no., customer, phone, stock, VIN…"
-              style="max-width: min(420px, 100%); margin-left: auto"
-            />
-          </div>
-          <div class="tableWrap">
-            <table class="table" id="invoicesArchiveTable">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Invoice no.</th>
-                  <th>Customer</th>
-                  <th>Payment</th>
-                  <th class="num">Total</th>
-                  <th class="actions">Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div class="card__footer muted" id="invoicesArchiveSummary">0 invoices</div>
-        </div>
-      </section>
-
-      <section class="panel" id="panel-quotation" data-panel="quotation" role="tabpanel">
-        <div class="panel__header">
-          <div>
-            <h2>Quotation</h2>
-            <p class="muted">Select customer and vehicle from inventory, then send or print the quotation.</p>
-          </div>
-          <div class="panel__actions">
-            <button class="btn btn--ghost" id="btnSaveQuotation" type="button">Save Quotation</button>
-            <button class="btn" id="btnSendQuotationWhatsapp" type="button">Send WhatsApp</button>
-            <button class="btn btn--primary" id="btnPrintQuotation" type="button">Print Quotation</button>
-          </div>
-        </div>
-
-        <div class="grid grid--2">
-          <div class="card">
-            <div class="card__header">
-              <h3>Create Quotation</h3>
-            </div>
-            <div class="formGrid">
-              <label class="field">
-                <span>Quotation ref.</span>
-                <input id="quotationRefNo" type="text" placeholder="Auto when printing / saving" />
-              </label>
-              <label class="field">
-                <span>Date</span>
-                <input id="quotationDate" type="date" />
-              </label>
-              <label class="field">
-                <span>Valid Until</span>
-                <input id="quotationValidUntil" type="date" />
-              </label>
-              <label class="field">
-                <span>Customer (saved)</span>
-                <select id="quotationCustomerPick">
-                  <option value="">Select customer</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Customer Name</span>
-                <input id="quotationCustomerName" type="text" placeholder="Customer name" />
-              </label>
-              <label class="field">
-                <span>Customer Phone</span>
-                <input id="quotationCustomerPhone" type="tel" placeholder="Phone number" />
-              </label>
-              <label class="field field--full">
-                <span>Vehicle (from inventory)</span>
-                <select id="quotationVehiclePick">
-                  <option value="">Select vehicle</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>Quoted Price</span>
-                <input id="quotationPrice" type="number" min="0" step="0.01" placeholder="0.00" />
-              </label>
-              <label class="field">
-                <span>Remarks</span>
-                <input id="quotationRemarks" type="text" placeholder="Optional remarks" />
-              </label>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card__header">
-              <h3>Quotation Preview</h3>
-              <p class="muted">Matches print layout: letterhead, vehicle table, amount in words, signatures.</p>
-            </div>
-            <div id="quotationPreview" class="muted">Select a vehicle to preview the formal quotation layout.</div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top: 14px">
-          <div class="card__header">
-            <h3>Terms &amp; conditions</h3>
-            <div class="panel__actions" style="margin: 0">
-              <button class="btn btn--ghost" type="button" id="btnQuotationTermsDefault">Save as default</button>
-            </div>
-          </div>
-          <p class="muted" style="margin: 0 0 10px">
-            Edit for this quotation. <strong>Save as default</strong> stores the text for future quotes (also saved on each saved quotation).
-          </p>
-          <label class="field field--full">
-            <span>Terms (print &amp; PDF)</span>
-            <textarea id="quotationTerms" class="input" rows="10" placeholder="Terms and conditions…"></textarea>
-          </label>
-        </div>
-
-        <div class="card" style="margin-top:14px;">
-          <div class="card__header">
-            <h3>Saved Quotation List</h3>
-          </div>
-          <div class="tableWrap">
-            <table class="table" id="quotationTable">
-              <thead>
-                <tr>
-                  <th>Ref / Date</th>
-                  <th>Customer</th>
-                  <th>Vehicle</th>
-                  <th>Valid Until</th>
-                  <th class="num">Amount</th>
-                  <th class="actions">Actions</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div class="card__footer muted" id="quotationSummary">0 quotations</div>
         </div>
       </section>
 
@@ -1213,11 +1436,26 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="card__header">
-            <h3>Sold Vehicles</h3>
-            <div class="row">
-              <input id="soldVehicleSearch" class="input" type="search" placeholder="Search invoice / stock / customer / make / model" />
+        <div class="card soldListCard">
+          <div class="card__header soldListCard__header">
+            <div class="soldListCard__titleBlock">
+              <h3>Sold Vehicles</h3>
+            </div>
+            <div class="soldListCard__toolbar">
+              <label class="field soldListDateField">
+                <span>From</span>
+                <input id="soldVehicleListFrom" type="date" title="Start of date range" />
+              </label>
+              <label class="field soldListDateField">
+                <span>To</span>
+                <input id="soldVehicleListTo" type="date" title="End of date range" />
+              </label>
+              <input
+                id="soldVehicleSearch"
+                class="input soldListCard__search"
+                type="search"
+                placeholder="Search invoice / stock / customer / make / model"
+              />
             </div>
           </div>
           <div class="tableWrap">
@@ -1258,18 +1496,33 @@
         </div>
 
         <div class="grid" style="grid-template-columns: 1fr;">
-          <div class="card">
-            <div class="card__header">
-              <h3>Refused vehicles</h3>
-              <div class="row">
-                <input id="refusedVehicleSearch" class="input" type="search" placeholder="Search by Vehicle number or Chassis number" />
+          <div class="card refusedListCard">
+            <div class="card__header refusedListCard__header">
+              <div class="refusedListCard__titleBlock">
+                <h3>Refused vehicles</h3>
+              </div>
+              <div class="refusedListCard__toolbar">
+                <label class="field refusedListDateField">
+                  <span>From</span>
+                  <input id="refusedVehicleListFrom" type="date" title="Start of date range" />
+                </label>
+                <label class="field refusedListDateField">
+                  <span>To</span>
+                  <input id="refusedVehicleListTo" type="date" title="End of date range" />
+                </label>
+                <input
+                  id="refusedVehicleSearch"
+                  class="input refusedListCard__search"
+                  type="search"
+                  placeholder="Search by Vehicle number or Chassis number"
+                />
               </div>
             </div>
             <div class="tableWrap">
               <table class="table" id="refusedVehiclesTable">
                 <thead>
                   <tr>
-                    <th>Date</th>
+                    <th>Refusal date</th>
                     <th>Vehicle number</th>
                     <th>Make</th>
                     <th>Model</th>
@@ -1380,7 +1633,7 @@
 
               <label class="field field--full">
                 <span class="row" style="justify-content:space-between;">
-                  <span>Immediate After-Billing (Invoice SMS)</span>
+                  <span>Immediate After-Invoice (Invoice SMS)</span>
                   <input id="invoiceSentAuto" type="checkbox" />
                 </span>
                 <textarea
@@ -1667,10 +1920,22 @@
           </div>
         </div>
 
-        <div class="card">
-            <div class="card__header">
-              <h3>Purchase List</h3>
-              <input id="purchaseSearch" class="input" type="search" placeholder="Search purchases" />
+        <div class="card purchaseListCard">
+            <div class="card__header purchaseListCard__header">
+              <div class="purchaseListCard__titleBlock">
+                <h3>Purchase List</h3>
+              </div>
+              <div class="purchaseListCard__toolbar">
+                <label class="field purchaseListDateField">
+                  <span>From</span>
+                  <input id="purchaseListFrom" type="date" title="Start of date range" />
+                </label>
+                <label class="field purchaseListDateField">
+                  <span>To</span>
+                  <input id="purchaseListTo" type="date" title="End of date range" />
+                </label>
+                <input id="purchaseSearch" class="input purchaseListCard__search" type="search" placeholder="Search purchases" />
+              </div>
             </div>
             <div class="tableWrap">
               <table class="table" id="purchaseTable">
@@ -1703,20 +1968,34 @@
             <button class="btn btn--primary" type="button" id="btnAddNewGarageJob" title="Open add-garage-job form">+ Add new Garage job</button>
           </div>
         </div>
-        <div class="card">
-          <div class="card__header">
-            <h3>Job list</h3>
-            <input id="garageJobSearch" class="input" type="search" placeholder="Search jobs" />
+        <div class="card garageJobListCard">
+          <div class="card__header garageJobListCard__header">
+            <div class="garageJobListCard__titleBlock">
+              <h3>Job list</h3>
+            </div>
+            <div class="garageJobListCard__toolbar">
+              <label class="field garageJobListDateField">
+                <span>From</span>
+                <input id="garageJobListFrom" type="date" title="Start of date range" />
+              </label>
+              <label class="field garageJobListDateField">
+                <span>To</span>
+                <input id="garageJobListTo" type="date" title="End of date range" />
+              </label>
+              <input id="garageJobSearch" class="input garageJobListCard__search" type="search" placeholder="Search jobs" />
+            </div>
           </div>
           <div class="tableWrap">
             <table class="table" id="garageJobsTable">
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>Job date</th>
+                  <th>Job done</th>
                   <th>Title</th>
                   <th>Stock no.</th>
                   <th>Vehicle Number</th>
                   <th>Status</th>
+                  <th title="Days open while in progress; over 30 days in red">Open days</th>
                   <th class="actions">Actions</th>
                 </tr>
               </thead>
@@ -1731,7 +2010,7 @@
         <div class="panel__header">
           <div>
             <h2>Customer</h2>
-            <p class="muted">Keep a contact list for follow-ups and billing references.</p>
+            <p class="muted">Keep a contact list for follow-ups and invoice references.</p>
           </div>
           <div class="panel__actions">
             <button class="btn btn--primary" type="button" id="btnAddNewCustomer" title="Open add-customer window">
@@ -1949,6 +2228,14 @@
                 <input id="garageJobVehicleNumber" type="text" placeholder="e.g. ABC-1234" autocomplete="off" />
               </label>
               <label class="field">
+                <span>Garage job date</span>
+                <input id="garageJobDate" type="date" />
+              </label>
+              <label class="field">
+                <span>Garage job done</span>
+                <input id="garageJobDone" type="date" title="Date the job was completed" />
+              </label>
+              <label class="field">
                 <span>Status</span>
                 <select id="garageJobStatus">
                   <option value="In progress">In progress</option>
@@ -2011,6 +2298,10 @@
         <div class="dialog__body dialog__body--vehicle">
           <form id="refusedVehicleForm" class="formGrid">
             <input type="hidden" id="refusedVehicleId" />
+            <label class="field">
+              <span>Date</span>
+              <input id="refusedRefusalDate" type="date" required title="Date of refusal" />
+            </label>
             <label class="field">
               <span>Vehicle number</span>
               <input id="refusedVehicleNumber" type="text" autocomplete="off" />
@@ -2193,6 +2484,8 @@
                 <select id="purchaseSource">
                   <option value="supplier">Supplier</option>
                   <option value="broker">Broker</option>
+                  <option value="unregistered_overseas">Unregistered overseas</option>
+                  <option value="unregistered_local">Unregistered local</option>
                 </select>
               </label>
               <label class="field field--full">
@@ -2668,7 +2961,7 @@
               <div class="field field--full" id="vehicleExtraItemsSection">
                 <span>Extra / add-on items</span>
                 <p class="muted" style="font-size: 13px; margin: 4px 0 8px">
-                  Optional accessories, warranty, delivery, etc. Shown on the cart and invoice when this vehicle is sold.
+                  Optional accessories, warranty, delivery, etc. Shown on the invoice when this vehicle is sold.
                 </p>
                 <div id="vehicleExtraItemsList" class="vehicleExtraItemsList"></div>
                 <button type="button" class="btn btn--ghost" id="btnAddVehicleExtraItem">+ Add item</button>
@@ -3280,6 +3573,6 @@
       </div>
     </dialog>
 
-    <script src="./app.js"></script>
+    <script src="./app.js?v=20260407"></script>
   </body>
 </html>
